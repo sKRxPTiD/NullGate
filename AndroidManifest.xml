@@ -1,0 +1,27 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.nullprotocol.nullgate">
+    <application
+        android:allowBackup="false"
+        android:label="NullGate Prototype"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".ClientRequestActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="org.nullprotocol.nullgate.action.REQUEST_THEME_LEASE" />
+                <action android:name="org.nullprotocol.nullgate.action.REVOKE_LEASE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

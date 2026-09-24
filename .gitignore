@@ -1,0 +1,26 @@
+# Reproducible build output
+/build/
+/dist/
+/broker/build-test/
+/client/build-test/
+
+# Local signing identities: never commit these
+/keys/
+*.keystore
+*.jks
+*.idsig
+
+# Device-local state and captured logs
+/device/.locks/
+/device/logs/
+
+# Local upstream checkouts and generated bundles
+/integrations/colorblendr-upstream/
+*.bundle
+
+# Editor and OS state
+.idea/
+.vscode/
+*.iml
+.DS_Store
+*~

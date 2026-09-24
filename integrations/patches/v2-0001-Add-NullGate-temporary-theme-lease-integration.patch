@@ -1,0 +1,580 @@
+From 142aaa14d528000f7484609d03698297227dfea5 Mon Sep 17 00:00:00 2001
+From: Wolf <wolf@nullprotocol.local>
+Date: Thu, 24 Sep 2026 13:09:17 -0500
+Subject: [PATCH v2] Add NullGate temporary theme lease integration
+
+---
+ NULLGATE_INTEGRATION.md                       |  46 +++++
+ .../colorblendr/data/common/Utilities.kt      |   6 +-
+ .../colorblendr/data/enums/WorkMethod.kt      |   5 +-
+ .../colorblendr/ui/activities/MainActivity.kt |  33 +++
+ .../ui/compose/navigation/AppNavHost.kt       |  13 ++
+ .../screens/onboarding/OnboardingScreen.kt    |  16 +-
+ .../utils/manager/OverlayManager.kt           |  22 ++
+ .../utils/nullgate/NullGateThemeClient.kt     | 188 ++++++++++++++++++
+ app/src/main/res/values/strings.xml           |   6 +-
+ 9 files changed, 330 insertions(+), 5 deletions(-)
+ create mode 100644 NULLGATE_INTEGRATION.md
+ create mode 100644 app/src/main/java/com/drdisagree/colorblendr/utils/nullgate/NullGateThemeClient.kt
+
+diff --git a/NULLGATE_INTEGRATION.md b/NULLGATE_INTEGRATION.md
+new file mode 100644
+index 0000000..0f11037
+--- /dev/null
++++ b/NULLGATE_INTEGRATION.md
+@@ -0,0 +1,46 @@
++# NullGate integration
++
++This patch adds `NULLGATE` as a ColorBlendr work method. ColorBlendr sends a
++typed system-theme request to the separately installed NullGate controller and
++does not receive a root shell, a privileged binder, or arbitrary command
++execution.
++
++## Trust and request flow
++
++1. ColorBlendr verifies the installed NullGate APK against its pinned SHA-256
++   signing-certificate digest.
++2. A theme change is accepted only while ColorBlendr is in the foreground.
++3. ColorBlendr launches NullGate explicitly for a result with exactly four
++   fields: protocol version, opaque ARGB seed, supported Monet style, and a
++   60-second duration.
++4. NullGate independently verifies ColorBlendr's package, UID ownership,
++   version, and official signing certificate before showing user approval.
++5. ColorBlendr stores only the returned lease ID and expiry receipt. It revokes
++   an existing lease before requesting a replacement.
++6. Removing ColorBlendr's fabricated colors requests immediate revocation.
++
++The current NullGate policy reviews ColorBlendr version code 42 and the official
++ColorBlendr signer. A future upstream release must be reviewed and its new
++version code admitted by NullGate before the release can use the integration.
++
++## Deliberate limitations
++
++- Background, boot, and Tasker-triggered theme changes fail closed in NullGate
++  mode because every privileged request requires a visible, result-bound user
++  confirmation.
++- `CMF` is not part of the NullGate theme capability and is rejected.
++- The first compatibility duration is fixed at 60 seconds for reversible
++  validation. Extending the lease is a separate policy decision.
++- A locally debug-signed ColorBlendr APK cannot impersonate the official app and
++  will be rejected by NullGate.
++
++## Host verification
++
++```text
++./gradlew :app:compileDebugKotlin
++./gradlew :app:assembleDebug
++./gradlew :app:lintDebug
++```
++
++Do not uninstall the official ColorBlendr or install a debug-signed replacement
++on a daily-driver device merely to test this patch.
+diff --git a/app/src/main/java/com/drdisagree/colorblendr/data/common/Utilities.kt b/app/src/main/java/com/drdisagree/colorblendr/data/common/Utilities.kt
+index 88b2a6d..4271296 100644
+--- a/app/src/main/java/com/drdisagree/colorblendr/data/common/Utilities.kt
++++ b/app/src/main/java/com/drdisagree/colorblendr/data/common/Utilities.kt
+@@ -113,6 +113,10 @@ object Utilities {
+         return getWorkingMethod() == WorkMethod.WIRELESS_ADB
+     }
+ 
++    fun isNullGateMode(): Boolean {
++        return getWorkingMethod() == WorkMethod.NULLGATE
++    }
++
+     fun isWorkMethodUnknown(): Boolean {
+         return getWorkingMethod() == WorkMethod.NULL
+     }
+@@ -417,4 +421,4 @@ object Utilities {
+     fun getCommunityThemeRepository(): CommunityThemeRepository {
+         return CommunityThemeRepository(AppDatabase.getInstance().communityThemeDao())
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/app/src/main/java/com/drdisagree/colorblendr/data/enums/WorkMethod.kt b/app/src/main/java/com/drdisagree/colorblendr/data/enums/WorkMethod.kt
+index ebbd7a5..b917d3c 100644
+--- a/app/src/main/java/com/drdisagree/colorblendr/data/enums/WorkMethod.kt
++++ b/app/src/main/java/com/drdisagree/colorblendr/data/enums/WorkMethod.kt
+@@ -4,7 +4,8 @@ enum class WorkMethod {
+     NULL,
+     ROOT,
+     SHIZUKU,
+-    WIRELESS_ADB;
++    WIRELESS_ADB,
++    NULLGATE;
+ 
+     companion object {
+         fun fromString(str: String?): WorkMethod {
+@@ -15,4 +16,4 @@ enum class WorkMethod {
+             }
+         }
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/app/src/main/java/com/drdisagree/colorblendr/ui/activities/MainActivity.kt b/app/src/main/java/com/drdisagree/colorblendr/ui/activities/MainActivity.kt
+index 2419f6f..a5ef613 100644
+--- a/app/src/main/java/com/drdisagree/colorblendr/ui/activities/MainActivity.kt
++++ b/app/src/main/java/com/drdisagree/colorblendr/ui/activities/MainActivity.kt
+@@ -12,6 +12,7 @@ import android.view.ViewGroup
+ import android.view.ViewGroup.MarginLayoutParams
+ import android.widget.Toast
+ import androidx.activity.compose.setContent
++import androidx.activity.result.contract.ActivityResultContracts
+ import androidx.activity.viewModels
+ import androidx.appcompat.app.AppCompatActivity
+ import androidx.compose.runtime.getValue
+@@ -37,6 +38,7 @@ import com.drdisagree.colorblendr.data.common.Constant.ADB_PAIR_NOTIFICATION
+ import com.drdisagree.colorblendr.data.common.Constant.ADB_SEARCH_NOTIFICATION
+ import com.drdisagree.colorblendr.data.common.Utilities
+ import com.drdisagree.colorblendr.data.common.Utilities.isFirstRun
++import com.drdisagree.colorblendr.data.common.Utilities.isNullGateMode
+ import com.drdisagree.colorblendr.data.common.Utilities.isRootMode
+ import com.drdisagree.colorblendr.data.common.Utilities.isShizukuMode
+ import com.drdisagree.colorblendr.data.common.Utilities.isWirelessAdbMode
+@@ -56,6 +58,7 @@ import com.drdisagree.colorblendr.utils.community.CommunityThemeCodec
+ import com.drdisagree.colorblendr.utils.community.TestThemeHolder
+ import org.json.JSONObject
+ import com.drdisagree.colorblendr.utils.fabricated.FabricatedUtil.updateFabricatedAppList
++import com.drdisagree.colorblendr.utils.nullgate.NullGateThemeClient
+ import com.drdisagree.colorblendr.utils.shizuku.ShizukuUtil.hasShizukuPermission
+ import com.drdisagree.colorblendr.utils.shizuku.ShizukuUtil.isShizukuAvailable
+ import com.drdisagree.colorblendr.utils.wallpaper.WallpaperColorUtil.updateWallpaperColorList
+@@ -73,6 +76,12 @@ import kotlin.time.Duration.Companion.milliseconds
+ 
+ class MainActivity : AppCompatActivity() {
+ 
++    private val nullGateResult = registerForActivityResult(
++        ActivityResultContracts.StartActivityForResult()
++    ) { result ->
++        NullGateThemeClient.handleResult(result.resultCode, result.data)
++    }
++
+     private val timeoutHandler: Handler = Handler(Looper.getMainLooper())
+     private var timeoutRunnable: Runnable? = null
+     private val colorsViewModel: ColorsViewModel by viewModels()
+@@ -89,6 +98,13 @@ class MainActivity : AppCompatActivity() {
+         super.onCreate(savedInstanceState)
+         DynamicColors.applyToActivityIfAvailable(this)
+         setupEdgeToEdge()
++        NullGateThemeClient.bind(
++            context = this,
++            launchForResult = nullGateResult::launch,
++            notifyUser = { message ->
++                Toast.makeText(this, message, Toast.LENGTH_LONG).show()
++            }
++        )
+ 
+         // colorblendr://theme/<id> opens a community creation by id;
+         // colorblendr://preview?data=<base64 payload> previews an arbitrary
+@@ -145,6 +161,16 @@ class MainActivity : AppCompatActivity() {
+         initSuccess?.let { outState.putBoolean(KEY_INIT_SUCCESS, it) }
+     }
+ 
++    override fun onStart() {
++        super.onStart()
++        NullGateThemeClient.setForeground(true)
++    }
++
++    override fun onStop() {
++        NullGateThemeClient.setForeground(false)
++        super.onStop()
++    }
++
+     private fun loadPreviewFromDeepLink(encoded: String?): String? {
+         if (encoded.isNullOrEmpty()) return null
+         return try {
+@@ -229,6 +255,11 @@ class MainActivity : AppCompatActivity() {
+                     }
+                 }
+ 
++                isNullGateMode() -> {
++                    success.set(NullGateThemeClient.trustedControllerInstalled(applicationContext))
++                    countDownLatch.countDown()
++                }
++
+                 else -> {
+                     success.set(false)
+                     countDownLatch.countDown()
+@@ -244,6 +275,7 @@ class MainActivity : AppCompatActivity() {
+         isRootMode() -> !RootConnectionProvider.isNotConnected
+         isShizukuMode() -> !ShizukuConnectionProvider.isNotConnected
+         isWirelessAdbMode() -> WifiAdbShell.isMyDeviceConnected()
++        isNullGateMode() -> NullGateThemeClient.trustedControllerInstalled(applicationContext)
+         else -> false
+     }
+ 
+@@ -356,6 +388,7 @@ class MainActivity : AppCompatActivity() {
+ 
+     override fun onDestroy() {
+         cancelTimeout()
++        NullGateThemeClient.unbind()
+ 
+         super.onDestroy()
+     }
+diff --git a/app/src/main/java/com/drdisagree/colorblendr/ui/compose/navigation/AppNavHost.kt b/app/src/main/java/com/drdisagree/colorblendr/ui/compose/navigation/AppNavHost.kt
+index 354c316..740d4c9 100644
+--- a/app/src/main/java/com/drdisagree/colorblendr/ui/compose/navigation/AppNavHost.kt
++++ b/app/src/main/java/com/drdisagree/colorblendr/ui/compose/navigation/AppNavHost.kt
+@@ -39,6 +39,7 @@ import com.drdisagree.colorblendr.ui.viewmodels.ColorPaletteViewModel
+ import com.drdisagree.colorblendr.ui.viewmodels.ColorsViewModel
+ import com.drdisagree.colorblendr.ui.viewmodels.StylesViewModel
+ import com.drdisagree.colorblendr.utils.fabricated.FabricatedUtil.updateFabricatedAppList
++import com.drdisagree.colorblendr.utils.nullgate.NullGateThemeClient
+ import com.drdisagree.colorblendr.utils.shizuku.ShizukuUtil.isShizukuAvailable
+ import com.drdisagree.colorblendr.utils.shizuku.ShizukuUtil.requestShizukuPermission
+ import com.drdisagree.colorblendr.utils.wallpaper.WallpaperColorUtil.updateWallpaperColorList
+@@ -146,6 +147,17 @@ fun AppNavHost(
+         }
+     }
+ 
++    fun checkNullGateConnection() {
++        if (NullGateThemeClient.trustedControllerInstalled(context)) {
++            onboardingAction = OnboardingActionState.Connecting
++            goToHome()
++        } else {
++            onboardingAction = OnboardingActionState.Error(
++                context.getString(R.string.nullgate_service_not_found)
++            )
++        }
++    }
++
+     fun AnimatedContentTransitionScope<NavBackStackEntry>.enter(): EnterTransition =
+         slideInHorizontally(spatialSpec) { if (isPop(navController)) -it else it }
+ 
+@@ -170,6 +182,7 @@ fun AppNavHost(
+                 onCheckRootConnection = ::checkRootConnection,
+                 onCheckShizukuConnection = ::checkShizukuConnection,
+                 onCheckAdbConnection = ::checkAdbConnection,
++                onCheckNullGateConnection = ::checkNullGateConnection,
+                 onNavigateToPairing = { navController.navigateSingleTop(Routes.PAIRING) },
+                 popActivityBackStack = { false },
+                 onFinishActivity = { activity?.finish() }
+diff --git a/app/src/main/java/com/drdisagree/colorblendr/ui/compose/screens/onboarding/OnboardingScreen.kt b/app/src/main/java/com/drdisagree/colorblendr/ui/compose/screens/onboarding/OnboardingScreen.kt
+index ca078e2..0d169a8 100644
+--- a/app/src/main/java/com/drdisagree/colorblendr/ui/compose/screens/onboarding/OnboardingScreen.kt
++++ b/app/src/main/java/com/drdisagree/colorblendr/ui/compose/screens/onboarding/OnboardingScreen.kt
+@@ -106,6 +106,7 @@ fun OnboardingScreen(
+     onCheckRootConnection: () -> Unit,
+     onCheckShizukuConnection: () -> Unit,
+     onCheckAdbConnection: () -> Unit,
++    onCheckNullGateConnection: () -> Unit,
+     onNavigateToPairing: () -> Unit,
+     popActivityBackStack: () -> Boolean,
+     onFinishActivity: () -> Unit
+@@ -181,6 +182,7 @@ fun OnboardingScreen(
+                             WorkMethod.ROOT -> onCheckRootConnection()
+                             WorkMethod.SHIZUKU -> onCheckShizukuConnection()
+                             WorkMethod.WIRELESS_ADB -> onCheckAdbConnection()
++                            WorkMethod.NULLGATE -> onCheckNullGateConnection()
+                         }
+                         return@Button
+                     }
+@@ -689,6 +691,17 @@ private fun OnboardingPage4(onNavigateToPairing: () -> Unit) {
+                     } else {
+                         selectedMethod = WorkMethod.WIRELESS_ADB
+                     }
++                },
++                modifier = Modifier.padding(bottom = 16.dp)
++            )
++            SelectableCard(
++                title = stringResource(R.string.mode_four_title),
++                description = stringResource(R.string.mode_four_desc),
++                selected = selectedMethod == WorkMethod.NULLGATE,
++                onSelect = {
++                    WORKING_METHOD = WorkMethod.NULLGATE
++                    selectedMethod = WorkMethod.NULLGATE
++                    WifiAdbShell.disconnect()
+                 }
+             )
+         }
+@@ -706,6 +719,7 @@ private fun OnboardingScreenPreview() {
+             onCheckRootConnection = {},
+             onCheckShizukuConnection = {},
+             onCheckAdbConnection = {},
++            onCheckNullGateConnection = {},
+             onNavigateToPairing = {},
+             popActivityBackStack = { false },
+             onFinishActivity = {}
+@@ -746,4 +760,4 @@ private fun Modifier.verticalFadingEdges(
+                 blendMode = BlendMode.DstIn
+             )
+         }
+-    }
+\ No newline at end of file
++    }
+diff --git a/app/src/main/java/com/drdisagree/colorblendr/utils/manager/OverlayManager.kt b/app/src/main/java/com/drdisagree/colorblendr/utils/manager/OverlayManager.kt
+index e4dccfc..104e715 100644
+--- a/app/src/main/java/com/drdisagree/colorblendr/utils/manager/OverlayManager.kt
++++ b/app/src/main/java/com/drdisagree/colorblendr/utils/manager/OverlayManager.kt
+@@ -19,8 +19,10 @@ import com.drdisagree.colorblendr.data.common.Utilities.getAccentSaturation
+ import com.drdisagree.colorblendr.data.common.Utilities.getBackgroundLightness
+ import com.drdisagree.colorblendr.data.common.Utilities.getBackgroundSaturation
+ import com.drdisagree.colorblendr.data.common.Utilities.getCurrentMonetStyle
++import com.drdisagree.colorblendr.data.common.Utilities.getSeedColorValue
+ import com.drdisagree.colorblendr.data.common.Utilities.getSelectedFabricatedApps
+ import com.drdisagree.colorblendr.data.common.Utilities.isRootMode
++import com.drdisagree.colorblendr.data.common.Utilities.isNullGateMode
+ import com.drdisagree.colorblendr.data.common.Utilities.isShizukuMode
+ import com.drdisagree.colorblendr.data.common.Utilities.isShizukuThemingEnabled
+ import com.drdisagree.colorblendr.data.common.Utilities.isThemingEnabled
+@@ -44,6 +46,7 @@ import com.drdisagree.colorblendr.utils.fabricated.FabricatedUtil.assignFullPale
+ import com.drdisagree.colorblendr.utils.fabricated.FabricatedUtil.assignPerAppColorsToOverlay
+ import com.drdisagree.colorblendr.utils.fabricated.FabricatedUtil.generateSurfaceEffectColors
+ import com.drdisagree.colorblendr.utils.shizuku.ShizukuUtil
++import com.drdisagree.colorblendr.utils.nullgate.NullGateThemeClient
+ import com.drdisagree.colorblendr.utils.wifiadb.WifiAdbShell
+ 
+ @Suppress("unused")
+@@ -386,6 +389,17 @@ object OverlayManager {
+     }
+ 
+     private fun applyFabricatedColorsNonRoot(): Boolean? {
++        if (isNullGateMode()) {
++            val accepted = NullGateThemeClient.requestTheme(
++                seedArgb = getSeedColorValue(Color.BLUE),
++                themeStyle = getCurrentMonetStyle().name
++            )
++            if (!accepted) {
++                reportError(appContext.getString(R.string.error_nullgate_unavailable))
++            }
++            return accepted
++        }
++
+         val isShizukuMode = isShizukuMode()
+         val isWirelessAdbMode = isWirelessAdbMode()
+ 
+@@ -481,6 +495,14 @@ object OverlayManager {
+     }
+ 
+     private fun removeFabricatedColorsNonRoot(): Boolean? {
++        if (isNullGateMode()) {
++            val accepted = NullGateThemeClient.revokeActiveLease()
++            if (!accepted) {
++                reportError(appContext.getString(R.string.error_nullgate_unavailable))
++            }
++            return accepted
++        }
++
+         val isShizukuMode = isShizukuMode()
+         val isWirelessAdbMode = isWirelessAdbMode()
+ 
+diff --git a/app/src/main/java/com/drdisagree/colorblendr/utils/nullgate/NullGateThemeClient.kt b/app/src/main/java/com/drdisagree/colorblendr/utils/nullgate/NullGateThemeClient.kt
+new file mode 100644
+index 0000000..8c570a7
+--- /dev/null
++++ b/app/src/main/java/com/drdisagree/colorblendr/utils/nullgate/NullGateThemeClient.kt
+@@ -0,0 +1,188 @@
++package com.drdisagree.colorblendr.utils.nullgate
++
++import android.app.Activity
++import android.content.ComponentName
++import android.content.Context
++import android.content.Intent
++import android.content.pm.PackageManager
++import android.os.Handler
++import android.os.Looper
++import java.security.MessageDigest
++
++/**
++ * Typed ColorBlendr client for NullGate. This class can request only a temporary
++ * system-theme capability; it never receives a shell, file access, or root.
++ */
++object NullGateThemeClient {
++    private const val NULLGATE_PACKAGE = "org.nullprotocol.nullgate"
++    private const val NULLGATE_ACTIVITY = "org.nullprotocol.nullgate.ClientRequestActivity"
++    private const val NULLGATE_SIGNER =
++        "fc122f22e4716ba03cae81893783e437553d4a3ad21e897f4efe3367c415bafe"
++    private const val ACTION_REQUEST =
++        "org.nullprotocol.nullgate.action.REQUEST_THEME_LEASE"
++    private const val ACTION_REVOKE =
++        "org.nullprotocol.nullgate.action.REVOKE_LEASE"
++    private const val STORE = "nullgate_client"
++    private const val DEFAULT_DURATION_MILLIS = 60_000L
++
++    private const val PHASE_IDLE = "IDLE"
++    private const val PHASE_REQUESTING = "REQUESTING"
++    private const val PHASE_REVOKING = "REVOKING"
++    private const val PHASE_REVOKING_FOR_REQUEST = "REVOKING_FOR_REQUEST"
++
++    private val mainHandler = Handler(Looper.getMainLooper())
++    private var launcher: ((Intent) -> Unit)? = null
++    private var notifier: ((String) -> Unit)? = null
++    private var foreground = false
++    private lateinit var appContext: Context
++
++    fun bind(
++        context: Context,
++        launchForResult: (Intent) -> Unit,
++        notifyUser: (String) -> Unit
++    ) {
++        appContext = context.applicationContext
++        launcher = launchForResult
++        notifier = notifyUser
++    }
++
++    fun unbind() {
++        launcher = null
++        notifier = null
++        foreground = false
++    }
++
++    fun setForeground(value: Boolean) {
++        foreground = value
++    }
++
++    fun trustedControllerInstalled(context: Context): Boolean {
++        return try {
++            val info = context.packageManager.getPackageInfo(
++                NULLGATE_PACKAGE,
++                PackageManager.GET_SIGNING_CERTIFICATES
++            )
++            val signers = info.signingInfo?.apkContentsSigners ?: return false
++            signers.size == 1 && sha256(signers[0].toByteArray()) == NULLGATE_SIGNER
++        } catch (_: Exception) {
++            false
++        }
++    }
++
++    fun requestTheme(seedArgb: Int, themeStyle: String): Boolean {
++        if (!::appContext.isInitialized || !foreground || launcher == null) return false
++        if (!trustedControllerInstalled(appContext)) return false
++        if ((seedArgb ushr 24) != 0xff || themeStyle == "CMF") return false
++
++        val prefs = prefs()
++        if (prefs.getString("phase", PHASE_IDLE) != PHASE_IDLE) return false
++        prefs.edit()
++            .putInt("pending_seed", seedArgb)
++            .putString("pending_style", themeStyle)
++            .putLong("pending_duration", DEFAULT_DURATION_MILLIS)
++            .apply()
++
++        return if (prefs.getString("active_lease", null) != null) {
++            prefs.edit().putString("phase", PHASE_REVOKING_FOR_REQUEST).commit()
++            launch(revokeIntent(prefs.getString("active_lease", null)!!))
++        } else {
++            prefs.edit().putString("phase", PHASE_REQUESTING).commit()
++            launch(pendingRequestIntent())
++        }
++    }
++
++    fun revokeActiveLease(): Boolean {
++        if (!::appContext.isInitialized || !foreground || launcher == null) return false
++        if (!trustedControllerInstalled(appContext)) return false
++        val prefs = prefs()
++        val leaseId = prefs.getString("active_lease", null) ?: return true
++        if (prefs.getString("phase", PHASE_IDLE) != PHASE_IDLE) return false
++        prefs.edit().putString("phase", PHASE_REVOKING).commit()
++        return launch(revokeIntent(leaseId))
++    }
++
++    fun handleResult(resultCode: Int, data: Intent?) {
++        if (!::appContext.isInitialized) return
++        val prefs = prefs()
++        val phase = prefs.getString("phase", PHASE_IDLE) ?: PHASE_IDLE
++        val decision = data?.getStringExtra("decision") ?: "NO_RESULT"
++
++        when (phase) {
++            PHASE_REQUESTING -> {
++                if (resultCode == Activity.RESULT_OK && decision == "GRANTED") {
++                    val leaseId = data?.getStringExtra("leaseId")
++                    if (!leaseId.isNullOrEmpty()) {
++                        prefs.edit()
++                            .putString("active_lease", leaseId)
++                            .putLong(
++                                "active_expires_elapsed",
++                                data.getLongExtra("expiresAtElapsedMillis", 0L)
++                            )
++                            .putString("phase", PHASE_IDLE)
++                            .commit()
++                        notify("NullGate granted the 60-second theme lease.")
++                        return
++                    }
++                }
++                prefs.edit().putString("phase", PHASE_IDLE).commit()
++                notify("NullGate did not grant the theme lease: $decision")
++            }
++
++            PHASE_REVOKING, PHASE_REVOKING_FOR_REQUEST -> {
++                if (resultCode == Activity.RESULT_OK && decision == "REVOKED") {
++                    prefs.edit()
++                        .remove("active_lease")
++                        .remove("active_expires_elapsed")
++                        .putString(
++                            "phase",
++                            if (phase == PHASE_REVOKING_FOR_REQUEST) PHASE_REQUESTING else PHASE_IDLE
++                        )
++                        .commit()
++                    if (phase == PHASE_REVOKING_FOR_REQUEST) {
++                        launch(pendingRequestIntent())
++                    } else {
++                        notify("NullGate revoked the active theme lease.")
++                    }
++                } else {
++                    prefs.edit().putString("phase", PHASE_IDLE).commit()
++                    notify("NullGate could not confirm revocation: $decision")
++                }
++            }
++
++            else -> notify("NullGate returned an unexpected result: $decision")
++        }
++    }
++
++    private fun pendingRequestIntent(): Intent {
++        val prefs = prefs()
++        return explicit(ACTION_REQUEST)
++            .putExtra("protocolVersion", 1)
++            .putExtra("seedArgb", prefs.getInt("pending_seed", 0))
++            .putExtra("themeStyle", prefs.getString("pending_style", "TONAL_SPOT"))
++            .putExtra("durationMillis", prefs.getLong("pending_duration", DEFAULT_DURATION_MILLIS))
++    }
++
++    private fun revokeIntent(leaseId: String): Intent = explicit(ACTION_REVOKE)
++        .putExtra("protocolVersion", 1)
++        .putExtra("leaseId", leaseId)
++
++    private fun explicit(action: String) = Intent(action).setComponent(
++        ComponentName(NULLGATE_PACKAGE, NULLGATE_ACTIVITY)
++    )
++
++    private fun launch(intent: Intent): Boolean {
++        val currentLauncher = launcher ?: return false
++        mainHandler.post { currentLauncher(intent) }
++        return true
++    }
++
++    private fun notify(message: String) {
++        mainHandler.post { notifier?.invoke(message) }
++    }
++
++    private fun prefs() = appContext.getSharedPreferences(STORE, Context.MODE_PRIVATE)
++
++    private fun sha256(value: ByteArray): String = MessageDigest.getInstance("SHA-256")
++        .digest(value)
++        .joinToString("") { "%02x".format(it.toInt() and 0xff) }
++}
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 8a16b7c..37c5df2 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -253,6 +253,10 @@
+     <string name="mode_two_desc">Use shizuku to work without root. Limited customization options will be available.</string>
+     <string name="mode_three_title">Wireless ADB</string>
+     <string name="mode_three_desc">Use ADB via Wireless Debugging. Limited customization options will be available.</string>
++    <string name="mode_four_title" translatable="false">NullGate</string>
++    <string name="mode_four_desc" translatable="false">Request narrow, temporary theme leases from the trusted NullGate controller. ColorBlendr receives no root shell.</string>
++    <string name="nullgate_service_not_found" translatable="false">The trusted NullGate controller is not installed.</string>
++    <string name="error_nullgate_unavailable" translatable="false">NullGate is unavailable, another request is active, or ColorBlendr is not in the foreground.</string>
+     <string name="shizuku_service_not_found">Shizuku permission not granted.</string>
+     <string name="grant_all_permissions">Please grant all permissions to proceed</string>
+     <string name="wireless_adb_not_connected">Wireless ADB not connected.</string>
+@@ -298,4 +302,4 @@
+     <string name="preview_applying">Applying colors…</string>
+     <string name="preview_discard">Discard changes</string>
+ 
+-</resources>
+\ No newline at end of file
++</resources>
+-- 
+2.43.0
+
