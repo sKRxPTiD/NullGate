@@ -95,7 +95,7 @@ public final class ClientRequestActivity extends Activity {
         return ExternalClientPolicy.authorizeThemeRequest(
                 extras.getInt(ClientRequestContract.EXTRA_PROTOCOL_VERSION, -1),
                 true, caller.uid, caller.packageName, caller.versionCode,
-                caller.owners, caller.digests,
+                caller.owners, caller.digests, soleSignerDigest(getPackageName()),
                 extras.getInt(ClientRequestContract.EXTRA_SEED_ARGB, 0),
                 extras.getString(ClientRequestContract.EXTRA_THEME_STYLE),
                 extras.getLong(ClientRequestContract.EXTRA_DURATION_MILLIS, -1));
@@ -109,7 +109,7 @@ public final class ClientRequestActivity extends Activity {
         ExternalClientPolicy.authorizeClient(
                 extras.getInt(ClientRequestContract.EXTRA_PROTOCOL_VERSION, -1), true,
                 caller.uid, caller.packageName, caller.versionCode,
-                caller.owners, caller.digests);
+                caller.owners, caller.digests, soleSignerDigest(getPackageName()));
         String requestedId = extras.getString(ClientRequestContract.EXTRA_LEASE_ID);
         SharedPreferences prefs = store();
         String recordedId = prefs.getString("lease_id", null);
@@ -152,11 +152,11 @@ public final class ClientRequestActivity extends Activity {
         title.setPadding(0, dp(22), 0, dp(12));
         page.addView(title);
         TextView details = label(
-                "ColorBlendr requests a temporary native theme lease.\n\n"
+                clientName() + " requests a temporary native theme lease.\n\n"
                 + "Seed: #" + String.format("%06X", approved.seedArgb & 0xffffff)
                 + "\nStyle: " + approved.style.name()
                 + "\nHard expiration: " + (approved.durationMillis / 1000L) + " seconds\n\n"
-                + "ColorBlendr receives no root shell or privileged process.",
+                + clientName() + " receives no root shell or privileged process.",
                 16, Color.rgb(89, 53, 36));
         page.addView(details, new LinearLayout.LayoutParams(-1, 0, 1));
         status = label("Review the request before approving.", 13, Color.rgb(116, 78, 55));
@@ -308,6 +308,25 @@ public final class ClientRequestActivity extends Activity {
 
     private void clearRecord() { store().edit().clear().commit(); }
     private SharedPreferences store() { return getSharedPreferences(STORE, MODE_PRIVATE); }
+
+    private String clientName() {
+        return ExternalClientPolicy.TEST_CLIENT_PACKAGE.equals(approved.clientPackage)
+                ? "NullGate Test Client" : "ColorBlendr";
+    }
+
+    private String soleSignerDigest(String packageName) throws Exception {
+        PackageInfo info = getPackageManager().getPackageInfo(
+                packageName, PackageManager.GET_SIGNING_CERTIFICATES);
+        if (info.signingInfo == null) throw new SecurityException("signer unavailable");
+        Signature[] signatures = info.signingInfo.getApkContentsSigners();
+        if (signatures == null || signatures.length != 1)
+            throw new SecurityException("sole current signer required");
+        byte[] digest = MessageDigest.getInstance("SHA-256")
+                .digest(signatures[0].toByteArray());
+        StringBuilder value = new StringBuilder(64);
+        for (byte part : digest) value.append(String.format("%02x", part & 0xff));
+        return value.toString();
+    }
 
     private TextView label(String value, int size, int color) {
         TextView text = new TextView(this); text.setText(value); text.setTextSize(size);

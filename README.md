@@ -45,7 +45,7 @@ artifacts, verifies APK signatures and records SHA-256 checksums, then runs
 simulated device-helper tests. Device tests now run after artifacts exist, so
 the build no longer depends on a previous dist directory.
 
-Current result: **74 host Java checks** (57 broker/security plus 17 external-client
+Current result: **79 host Java checks** (57 broker/security plus 22 external-client
 policy checks) and the stateful device-helper scenario suite pass, including six
 additional final-review regressions.
 These do not execute Android socket, SELinux, Activity lifecycle, app_process,
@@ -54,14 +54,18 @@ been run for this audit.
 
 Outputs:
 - `dist/NullGate-prototype-debug.apk`
+- `dist/NullGate-test-client-debug.apk`
 - `dist/NullGate-broker.jar`
 - `dist/controller-cert-sha256.txt`
 - `dist/SHA256SUMS`
 
 The first local build generates a development-only signing identity under
-`keys/`. Git ignores that directory. Keep the key and password file together
-for repeat local builds, and never publish them. Production distribution needs
-a separately managed release identity and a fresh signer-policy review.
+`keys/`. Git ignores that directory. The controller and test client are signed
+with that same local identity so each can reject an unpaired build. Keep the key
+and password file together for repeat local builds, and never publish them.
+Set `NULLGATE_KEY_DIR` to an existing private key directory when rebuilding an
+already-installed paired prototype. Production distribution needs a separately
+managed release identity and a fresh signer-policy review.
 
 ## Device safety gate
 
@@ -107,16 +111,19 @@ The product path is now explicitly self-contained: typed NullGate capabilities
 and an integration contract for clients. Shizuku is optional, not required.
 
 The controller now exposes a first typed client request/revoke Activity for the
-reviewed ColorBlendr 3.0.1 package. It requires a result-bound Android caller,
-pins package, sole UID ownership, version code and signer, rejects additional
-intent fields, shows an obscured-touch-protected approval screen, persists
-uncertain outcomes, and binds revoke to the original caller. A signer-pinning
-reference client compiles with every build. A direct ADB-shell spoof attempt on
-PiXi was denied with no broker runtime and ADB remaining non-root. The matching
-ColorBlendr client patch now builds off-device and is exported under
-`integrations/patches/`; PiXi's official ColorBlendr remains untouched. Live
-integration awaits upstream adoption under the official signer and a new
-NullGate version-policy review. See `CLIENT_INTEGRATION.md`.
+reviewed ColorBlendr 3.0.1 package and a separate first-party NullGate Test
+Client. It requires a result-bound Android caller, pins package, sole UID
+ownership, version code and signer, rejects additional intent fields, shows an
+obscured-touch-protected approval screen, persists uncertain outcomes, and
+binds revoke to the original caller. The test client is a distinct package and
+UID, is signed with the controller's local development identity, and receives
+only a lease receipt. A signer-pinning reference client compiles with every
+build. A direct ADB-shell spoof attempt on PiXi was denied with no broker
+runtime and ADB remaining non-root. The matching ColorBlendr client patch now
+builds off-device and is exported under `integrations/patches/`; PiXi's official
+ColorBlendr remains untouched. Live ColorBlendr integration awaits upstream
+adoption under the official signer and a new NullGate version-policy review.
+See `CLIENT_INTEGRATION.md` and `TEST_CLIENT.md`.
 
 Protocol v2 and the first native adapter are now implemented off-device. The
 typed `SYSTEM_THEME_SEED_APPLY` capability accepts only an opaque color and an
@@ -152,6 +159,7 @@ official package is present.
 
 - `BROKER_CONTRACT.md` defines the root-side protocol and invariants.
 - `CLIENT_INTEGRATION.md` defines the Android caller contract.
+- `TEST_CLIENT.md` defines the first-party external-app harness and limits.
 - `NATIVE_CAPABILITY_CONTRACT.md` defines the first typed native capability.
 - `THREAT_MODEL.md` and `SECURITY_AUDIT.md` record the current security boundary.
 - `integrations/patches/` contains the reviewed ColorBlendr integration patch.
