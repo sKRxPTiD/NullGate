@@ -56,7 +56,7 @@ an unmodified ColorBlendr release supports it.
 ## Required controller work
 
 - exported, explicit Android IPC endpoint with platform-provided caller UID;
-- signer-pinned client registry, initially ColorBlendr only;
+- signer-pinned client registry with per-client capability scope;
 - user-confirmation screen protected against obscured-touch approval;
 - persisted pending/active/revoking state across Activity and process restart;
 - correlated result and idempotent revoke token bound to the requesting UID;
@@ -68,6 +68,8 @@ The controller now contains the first implementation slice:
 - an explicit request/revoke Activity that requires a result-bound caller;
 - exact intent schemas with no additional fields;
 - ColorBlendr UID, sole-package, and current-signer verification;
+- a closed registry that binds each reviewed package, version, signer policy,
+  and allowed capability;
 - typed seed/style/duration parsing;
 - an obscured-touch-protected confirmation screen;
 - persisted uncertain-outcome recovery and caller-bound revocation;

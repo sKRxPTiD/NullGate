@@ -32,6 +32,7 @@ public final class ExternalClientPolicyTest {
         denies(() -> request(1, true, 10258, PACKAGE, new String[]{PACKAGE},
                 new String[]{SIGNER}, 0xff76543a, "TONAL_SPOT", 600_001));
         exactSchemasRejectMissingAndAdditionalFields();
+        registryScopesClientsToNamedCapabilities();
         revokeIdentityUsesTheSamePin();
         allowsPairedFirstPartyTestClient();
         denies(() -> testRequest(null, CONTROLLER_SIGNER, 1));
@@ -40,7 +41,7 @@ public final class ExternalClientPolicyTest {
         denies(() -> testRequest(CONTROLLER_SIGNER, CONTROLLER_SIGNER, 2));
         denies(() -> ExternalClientPolicy.authorizeClient(1, true, 10258, PACKAGE, 43,
                 new String[]{PACKAGE}, new String[]{SIGNER}));
-        System.out.println("NullGate external-client policy tests: 22 passed");
+        System.out.println("NullGate external-client policy tests: 26 passed");
     }
 
     private static void revokeIdentityUsesTheSamePin() {
@@ -64,6 +65,14 @@ public final class ExternalClientPolicyTest {
         check(ClientRequestContract.hasExactReconcileKeys(reconcile));
         reconcile.add(ClientRequestContract.EXTRA_LEASE_ID);
         check(!ClientRequestContract.hasExactReconcileKeys(reconcile));
+    }
+
+    private static void registryScopesClientsToNamedCapabilities() {
+        ExternalClientRegistry.requireCapability(PACKAGE, "SYSTEM_THEME_SEED_APPLY");
+        ExternalClientRegistry.requireCapability(TEST_PACKAGE, "SYSTEM_THEME_SEED_APPLY");
+        denies(() -> ExternalClientRegistry.requireCapability(PACKAGE, "GENERAL_SHELL"));
+        denies(() -> ExternalClientRegistry.requireCapability(
+                "org.nullprotocol.unreviewed", "SYSTEM_THEME_SEED_APPLY"));
     }
 
     private static void allowsPinnedTypedRequest() {

@@ -8,6 +8,7 @@ privilege.
 | --- | --- | --- |
 | Request schema | Exact fields, types, enums, and duration ceiling | Passed for `SYSTEM_THEME_SEED_APPLY` |
 | Caller identity | UID, sole owner package, version, and signer | Passed for reviewed ColorBlendr policy |
+| Client scope | Registered package is limited to named capabilities | Passed for ColorBlendr and first-party test client |
 | Approval | Visible, result-bound, obscured-touch-protected confirmation | Passed in supervised PiXi test |
 | Grant receipt | Correlated lease ID and bounded expiry | Passed with first-party test client |
 | Immediate revoke | Revoke returns confirmed cleanup | Passed with first-party test client |

@@ -45,7 +45,7 @@ artifacts, verifies APK signatures and records SHA-256 checksums, then runs
 simulated device-helper tests. Device tests now run after artifacts exist, so
 the build no longer depends on a previous dist directory.
 
-Current result: **153 host Java checks** (67 broker/security, 54 external-client
+Current result: **157 host Java checks** (67 broker/security, 58 external-client
 policy/state, and 32 test-client response/lifecycle checks) and the stateful device-helper scenario suite pass, including
 additional final-review regressions.
 These do not execute Android socket, SELinux, Activity lifecycle, app_process,
@@ -125,8 +125,10 @@ and an integration contract for clients. Shizuku is optional, not required.
 
 The controller now exposes a first typed client request/revoke Activity for the
 reviewed ColorBlendr 3.0.1 package and a separate first-party NullGate Test
-Client. It requires a result-bound Android caller, pins package, sole UID
-ownership, version code and signer, rejects additional intent fields, shows an
+Client. A closed client registry keeps package, version, signer source, and
+allowed capability together instead of embedding ColorBlendr-specific trust
+branches in the request parser. It requires a result-bound Android caller, pins
+package, sole UID ownership, version code and signer, rejects additional intent fields, shows an
 obscured-touch-protected approval screen, persists uncertain outcomes, and
 binds revoke to the original caller. The test client is a distinct package and
 UID, is signed with the controller's local development identity, and receives

@@ -50,20 +50,12 @@ public final class ExternalClientPolicy {
         if (!launchedForResult) throw new SecurityException("verified result caller required");
         if (callingUid < 10_000 || callingUid > 19_999)
             throw new SecurityException("owner-user ordinary app UID required");
-        final String expectedSigner;
-        final long expectedVersion;
-        if (COLORBLENDR_PACKAGE.equals(claimedPackage)) {
-            expectedSigner = COLORBLENDR_SIGNER;
-            expectedVersion = COLORBLENDR_VERSION_CODE;
-        } else if (TEST_CLIENT_PACKAGE.equals(claimedPackage)) {
-            expectedSigner = normalizeDigest(controllerSignerDigest);
-            expectedVersion = TEST_CLIENT_VERSION_CODE;
-            if (expectedSigner.isEmpty())
-                throw new SecurityException("controller signer unavailable");
-        } else {
-            throw new SecurityException("client package is not allowlisted");
-        }
-        if (clientVersionCode != expectedVersion)
+        ExternalClientRegistry.Registration registration =
+                ExternalClientRegistry.require(claimedPackage);
+        String expectedSigner = registration.expectedSigner(controllerSignerDigest);
+        if (expectedSigner.isEmpty())
+            throw new SecurityException("client signer policy is unavailable");
+        if (clientVersionCode != registration.versionCode)
             throw new SecurityException("client version is not reviewed");
         if (packagesForUid == null || packagesForUid.length != 1
                 || !claimedPackage.equals(packagesForUid[0]))
@@ -92,6 +84,8 @@ public final class ExternalClientPolicy {
         authorizeClient(protocolVersion, launchedForResult, callingUid, claimedPackage,
                 clientVersionCode, packagesForUid, currentSignerDigests,
                 controllerSignerDigest);
+        ExternalClientRegistry.requireCapability(
+                claimedPackage, "SYSTEM_THEME_SEED_APPLY");
         if ((seedArgb >>> 24) != 0xff) throw new SecurityException("seed must be opaque ARGB");
         if (durationMillis <= 0 || durationMillis > MAX_DURATION_MILLIS)
             throw new SecurityException("duration exceeds client policy");
@@ -103,9 +97,6 @@ public final class ExternalClientPolicy {
     }
 
     private static String normalizeDigest(String value) {
-        if (value == null) return "";
-        String normalized = value.replace(":", "").toLowerCase(java.util.Locale.ROOT);
-        if (!normalized.matches("[0-9a-f]{64}")) return "";
-        return normalized;
+        return ExternalClientRegistry.normalizeDigest(value);
     }
 }
