@@ -8,5 +8,7 @@ mkdir -p "$OUT_DIR"
 javac --release 8 -d "$OUT_DIR" \
   "$BASE_DIR/common/src/org/nullprotocol/nullgate/protocol/ExternalClientContract.java" \
   "$BASE_DIR/test-client/src/org/nullprotocol/nullgate/testclient/TestClientResponsePolicy.java" \
-  "$BASE_DIR/test-client/test/org/nullprotocol/nullgate/testclient/TestClientResponsePolicyTest.java"
+  "$BASE_DIR/test-client/src/org/nullprotocol/nullgate/testclient/TestClientStatePolicy.java" \
+  $(find "$BASE_DIR/test-client/test" -name '*.java' -print)
 java -cp "$OUT_DIR" org.nullprotocol.nullgate.testclient.TestClientResponsePolicyTest
+java -cp "$OUT_DIR" org.nullprotocol.nullgate.testclient.TestClientStatePolicyTest

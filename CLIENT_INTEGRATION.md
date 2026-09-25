@@ -17,7 +17,7 @@ capabilities.
    one installed owner-user package and verifies its pinned signing certificate.
 3. NullGate parses a versioned typed payload and rejects unknown fields,
    capabilities, enum values, durations, packages, or protocol versions.
-4. NullGate shows the target, requested effect, and hard expiration to the user.
+4. NullGate shows the target, requested effect, and bounded lease window to the user.
    No privileged request executes before confirmation.
 5. Only the signed NullGate controller talks to the ephemeral root broker.
 6. The broker independently re-verifies the controller and enforces its own

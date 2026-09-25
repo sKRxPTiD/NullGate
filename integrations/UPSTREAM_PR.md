@@ -31,7 +31,7 @@ https://github.com/sKRxPTiD/NullGate.
 
 NullGate independently verifies ColorBlendr's package name, sole UID ownership,
 version code, and official signing certificate. It presents the confirmation
-screen, applies the typed capability, enforces hard expiry, and restores the
+screen, applies the typed capability, schedules bounded expiry, and restores the
 previous theme state.
 
 ### Deliberate limitations

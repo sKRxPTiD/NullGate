@@ -27,10 +27,10 @@ It does not authorize a device write by itself.
 4. Start only the typed `SYSTEM_THEME_V1` broker mode.
 5. Open the NullGate Test Client and request its fixed 60-second lease.
 6. Confirm that NullGate identifies the requester as **NullGate Test Client**,
-   shows the fixed seed, style and hard expiration, and requires a visible tap.
+   shows the fixed seed, style and bounded lease window, and requires a visible tap.
 7. Exercise immediate revoke first. Confirm exact theme restoration, a clean
    lease inventory, and an intact controller recovery record.
-8. Repeat once using hard expiry instead of immediate revoke and verify the
+8. Repeat once using watchdog expiry instead of immediate revoke and verify the
    same exact restoration.
 9. Stop the broker through the guarded helper, archive its log, verify zero
    leases, remove only the validated managed runtime, and confirm it is absent.

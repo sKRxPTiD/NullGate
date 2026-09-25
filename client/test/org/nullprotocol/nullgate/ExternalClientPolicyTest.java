@@ -59,6 +59,11 @@ public final class ExternalClientPolicyTest {
         check(!ClientRequestContract.hasExactRequestKeys(request));
         request.add(ClientRequestContract.EXTRA_THEME_STYLE); request.add("command");
         check(!ClientRequestContract.hasExactRequestKeys(request));
+        java.util.Set<String> reconcile = new java.util.HashSet<>(java.util.Arrays.asList(
+                ClientRequestContract.EXTRA_PROTOCOL_VERSION));
+        check(ClientRequestContract.hasExactReconcileKeys(reconcile));
+        reconcile.add(ClientRequestContract.EXTRA_LEASE_ID);
+        check(!ClientRequestContract.hasExactReconcileKeys(reconcile));
     }
 
     private static void allowsPinnedTypedRequest() {

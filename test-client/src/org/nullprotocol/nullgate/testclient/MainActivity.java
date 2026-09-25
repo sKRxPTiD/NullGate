@@ -28,6 +28,7 @@ public final class MainActivity extends Activity {
             "org.nullprotocol.nullgate.ClientRequestActivity";
     private static final String ACTION_REQUEST = ExternalClientContract.ACTION_REQUEST_THEME;
     private static final String ACTION_REVOKE = ExternalClientContract.ACTION_REVOKE;
+    private static final String ACTION_RECONCILE = ExternalClientContract.ACTION_RECONCILE;
     private static final String EXTRA_PROTOCOL_VERSION = ExternalClientContract.EXTRA_PROTOCOL_VERSION;
     private static final String EXTRA_SEED_ARGB = ExternalClientContract.EXTRA_SEED_ARGB;
     private static final String EXTRA_THEME_STYLE = ExternalClientContract.EXTRA_THEME_STYLE;
@@ -37,6 +38,7 @@ public final class MainActivity extends Activity {
     private static final String EXTRA_EXPIRES_ELAPSED = ExternalClientContract.EXTRA_EXPIRES_ELAPSED;
     private static final int REQUEST_LEASE = 1001;
     private static final int REQUEST_REVOKE = 1002;
+    private static final int REQUEST_RECONCILE = 1003;
     private static final int TEST_SEED_ARGB = 0xff876a4b;
     private static final long TEST_DURATION_MILLIS = 60_000L;
     private static final String STORE = "test_client_state";
@@ -44,6 +46,7 @@ public final class MainActivity extends Activity {
     private TextView status;
     private Button requestButton;
     private Button revokeButton;
+    private Button reconcileButton;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -58,7 +61,7 @@ public final class MainActivity extends Activity {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setGravity(Gravity.CENTER_HORIZONTAL);
-        page.setPadding(pad, dp(48), pad, dp(48));
+        page.setPadding(pad, dp(48), pad, dp(96));
         page.setBackgroundColor(Color.rgb(230, 214, 193));
 
         TextView mark = label("∅ NULLGATE", 27, Color.rgb(0, 104, 61));
@@ -90,23 +93,49 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams revokeParams = new LinearLayout.LayoutParams(-1, dp(52));
         revokeParams.setMargins(0, dp(12), 0, 0);
         page.addView(revokeButton, revokeParams);
+
+        reconcileButton = actionButton("Check / reconcile uncertain result",
+                Color.rgb(116, 78, 55));
+        reconcileButton.setFilterTouchesWhenObscured(true);
+        reconcileButton.setOnClickListener(v -> reconcileLease());
+        LinearLayout.LayoutParams reconcileParams = new LinearLayout.LayoutParams(-1, dp(52));
+        reconcileParams.setMargins(0, dp(12), 0, 0);
+        page.addView(reconcileButton, reconcileParams);
         return page;
     }
 
     private void requestLease() {
         if (!pairedControllerInstalled()) {
             status.setText("Denied: the installed controller is absent or not signed by the paired key.");
-            refreshButtons(false);
+            refreshButtons(TestClientStatePolicy.UNKNOWN);
             return;
         }
         requestButton.setEnabled(false);
         status.setText("Opening NullGate's protected approval screen…");
+        if (!store().edit().putString("phase", TestClientStatePolicy.PENDING).commit()) {
+            status.setText("Request not sent: durable pending state could not be recorded.");
+            refreshButtons(TestClientStatePolicy.UNKNOWN);
+            return;
+        }
         Intent intent = explicit(ACTION_REQUEST)
                 .putExtra(EXTRA_PROTOCOL_VERSION, 1)
                 .putExtra(EXTRA_SEED_ARGB, TEST_SEED_ARGB)
                 .putExtra(EXTRA_THEME_STYLE, "TONAL_SPOT")
                 .putExtra(EXTRA_DURATION_MILLIS, TEST_DURATION_MILLIS);
         startActivityForResult(intent, REQUEST_LEASE);
+    }
+
+    private void reconcileLease() {
+        if (!pairedControllerInstalled()) {
+            status.setText("Cannot verify the paired controller; reconciliation was not attempted.");
+            refreshButtons(TestClientStatePolicy.UNKNOWN);
+            return;
+        }
+        requestButton.setEnabled(false); revokeButton.setEnabled(false);
+        reconcileButton.setEnabled(false);
+        status.setText("Opening NullGate to reconcile the uncertain result…");
+        startActivityForResult(explicit(ACTION_RECONCILE)
+                .putExtra(EXTRA_PROTOCOL_VERSION, 1), REQUEST_RECONCILE);
     }
 
     private void revokeLease() {
@@ -118,7 +147,7 @@ public final class MainActivity extends Activity {
         }
         if (!pairedControllerInstalled()) {
             status.setText("Cannot verify the paired controller; revocation was not attempted.");
-            refreshButtons(false);
+            refreshButtons(TestClientStatePolicy.UNKNOWN);
             return;
         }
         requestButton.setEnabled(false);
@@ -133,6 +162,7 @@ public final class MainActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_LEASE) handleLeaseResult(resultCode, data);
         else if (requestCode == REQUEST_REVOKE) handleRevokeResult(resultCode, data);
+        else if (requestCode == REQUEST_RECONCILE) handleReconcileResult(resultCode, data);
     }
 
     private void handleLeaseResult(int resultCode, Intent data) {
@@ -146,18 +176,25 @@ public final class MainActivity extends Activity {
                                 data.getLongExtra(EXTRA_EXPIRES_ELAPSED, -1L),
                                 SystemClock.elapsedRealtime());
                 if (store().edit().putString(EXTRA_LEASE_ID, receipt.leaseId)
-                        .putLong(EXTRA_EXPIRES_ELAPSED, receipt.expiresElapsed).commit()) {
-                    status.setText("GRANTED: receipt stored; hard expiry is active.");
-                    refreshButtons(true);
+                        .putLong(EXTRA_EXPIRES_ELAPSED, receipt.expiresElapsed)
+                        .putString("phase", TestClientStatePolicy.ACTIVE).commit()) {
+                    status.setText("GRANTED: receipt stored; expiry watchdog is active.");
+                    refreshButtons(TestClientStatePolicy.ACTIVE);
                     return;
                 }
                 throw new SecurityException("receipt persistence failed");
             }
-            status.setText("Not granted: " + decision);
+            if (!"GRANTED".equals(decision) && store().edit().clear().commit()) {
+                status.setText("Not granted: " + decision);
+                refreshButtons(TestClientStatePolicy.CLEAN);
+                return;
+            }
         } catch (SecurityException invalid) {
-            status.setText("Not granted: DENIED_INVALID_RESULT");
+            // The pre-dispatch PENDING marker remains unless UNKNOWN is durably recorded.
         }
-        refreshState();
+        store().edit().putString("phase", TestClientStatePolicy.UNKNOWN).commit();
+        status.setText("Result is uncertain. Reconcile before requesting again.");
+        refreshButtons(TestClientStatePolicy.UNKNOWN);
     }
 
     private void handleRevokeResult(int resultCode, Intent data) {
@@ -165,15 +202,52 @@ public final class MainActivity extends Activity {
             String decision = validatedDecision(data, false);
             if (TestClientResponsePolicy.isConfirmedRevoke(
                     resultCode == RESULT_OK, data.getExtras().keySet(), decision)) {
-                store().edit().clear().commit();
-                status.setText("REVOKED: NullGate confirmed cleanup.");
+                if (store().edit().clear().commit())
+                    status.setText("REVOKED: NullGate confirmed cleanup.");
+                else {
+                    store().edit().putString("phase", TestClientStatePolicy.UNKNOWN).commit();
+                    status.setText("Cleanup was confirmed, but local state is uncertain.");
+                }
             } else {
                 status.setText("Revocation not confirmed: " + decision);
             }
         } catch (SecurityException invalid) {
             status.setText("Revocation not confirmed: DENIED_INVALID_RESULT");
         }
-        refreshButtons(store().getString(EXTRA_LEASE_ID, null) != null);
+        refreshButtons(currentPhase());
+    }
+
+    private void handleReconcileResult(int resultCode, Intent data) {
+        try {
+            String decision = validatedDecision(data, true);
+            if (resultCode == RESULT_OK && "GRANTED".equals(decision)) {
+                TestClientResponsePolicy.Receipt receipt =
+                        TestClientResponsePolicy.requireFreshGrant(true,
+                                data.getExtras().keySet(), decision,
+                                data.getStringExtra(EXTRA_LEASE_ID),
+                                data.getLongExtra(EXTRA_EXPIRES_ELAPSED, -1L),
+                                SystemClock.elapsedRealtime());
+                if (store().edit().putString(EXTRA_LEASE_ID, receipt.leaseId)
+                        .putLong(EXTRA_EXPIRES_ELAPSED, receipt.expiresElapsed)
+                        .putString("phase", TestClientStatePolicy.ACTIVE).commit()) {
+                    status.setText("Reconciled: active lease receipt recovered.");
+                    refreshButtons(TestClientStatePolicy.ACTIVE);
+                    return;
+                }
+                throw new SecurityException("reconciled receipt persistence failed");
+            }
+            if ("NOT_FOUND".equals(decision)
+                    || "REVOKED_AFTER_UNCERTAIN_RESULT".equals(decision)) {
+                if (store().edit().clear().commit()) {
+                    status.setText("Reconciled clean: no active external lease remains.");
+                    refreshButtons(TestClientStatePolicy.CLEAN);
+                    return;
+                }
+            }
+        } catch (SecurityException invalid) { }
+        store().edit().putString("phase", TestClientStatePolicy.UNKNOWN).commit();
+        status.setText("Reconciliation is still uncertain. Do not request another lease.");
+        refreshButtons(TestClientStatePolicy.UNKNOWN);
     }
 
     private String validatedDecision(Intent data, boolean leaseResponse) {
@@ -186,13 +260,19 @@ public final class MainActivity extends Activity {
     private void refreshState() {
         if (!pairedControllerInstalled()) {
             status.setText("Paired NullGate controller not installed or signer mismatch.");
-            refreshButtons(false);
+            refreshButtons(TestClientStatePolicy.UNKNOWN);
             return;
         }
-        String leaseId = store().getString(EXTRA_LEASE_ID, null);
-        if (leaseId == null) {
+        String phase = currentPhase();
+        if (TestClientStatePolicy.CLEAN.equals(phase)) {
             status.setText("Ready. Controller and test client share the expected first-party signer.");
-            refreshButtons(false);
+            refreshButtons(phase);
+            return;
+        }
+        if (TestClientStatePolicy.PENDING.equals(phase)
+                || TestClientStatePolicy.UNKNOWN.equals(phase)) {
+            status.setText("An earlier result is unresolved. Reconcile before requesting again.");
+            refreshButtons(phase);
             return;
         }
         long remaining = store().getLong(EXTRA_EXPIRES_ELAPSED, 0L)
@@ -200,12 +280,25 @@ public final class MainActivity extends Activity {
         status.setText(remaining > 0
                 ? "Recorded lease active for at most " + ((remaining + 999L) / 1000L) + " seconds."
                 : "Recorded lease has expired; revoke to reconcile and confirm cleanup.");
-        refreshButtons(true);
+        refreshButtons(phase);
     }
 
-    private void refreshButtons(boolean hasLease) {
-        requestButton.setEnabled(!hasLease && pairedControllerInstalled());
-        revokeButton.setEnabled(hasLease && pairedControllerInstalled());
+    private String currentPhase() {
+        String leaseId = store().getString(EXTRA_LEASE_ID, null);
+        String phase = TestClientStatePolicy.normalize(store().getString("phase", null),
+                leaseId != null, store().getLong(EXTRA_EXPIRES_ELAPSED, 0L),
+                SystemClock.elapsedRealtime());
+        if (TestClientStatePolicy.UNKNOWN.equals(phase)
+                && !TestClientStatePolicy.UNKNOWN.equals(store().getString("phase", null)))
+            store().edit().putString("phase", TestClientStatePolicy.UNKNOWN).commit();
+        return phase;
+    }
+
+    private void refreshButtons(String phase) {
+        boolean paired = pairedControllerInstalled();
+        requestButton.setEnabled(paired && TestClientStatePolicy.canRequest(phase));
+        revokeButton.setEnabled(paired && TestClientStatePolicy.ACTIVE.equals(phase));
+        reconcileButton.setEnabled(paired && TestClientStatePolicy.needsReconcile(phase));
     }
 
     private boolean pairedControllerInstalled() {

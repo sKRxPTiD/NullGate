@@ -9,6 +9,8 @@ public final class ClientRequestContract {
             ExternalClientContract.ACTION_REQUEST_THEME;
     public static final String ACTION_REVOKE =
             ExternalClientContract.ACTION_REVOKE;
+    public static final String ACTION_RECONCILE =
+            ExternalClientContract.ACTION_RECONCILE;
     public static final String EXTRA_PROTOCOL_VERSION = ExternalClientContract.EXTRA_PROTOCOL_VERSION;
     public static final String EXTRA_SEED_ARGB = ExternalClientContract.EXTRA_SEED_ARGB;
     public static final String EXTRA_THEME_STYLE = ExternalClientContract.EXTRA_THEME_STYLE;
@@ -25,5 +27,9 @@ public final class ClientRequestContract {
 
     public static boolean hasExactRevokeKeys(Set<String> actual) {
         return ExternalClientContract.hasExactRevokeKeys(actual);
+    }
+
+    public static boolean hasExactReconcileKeys(Set<String> actual) {
+        return ExternalClientContract.hasExactReconcileKeys(actual);
     }
 }

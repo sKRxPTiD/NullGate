@@ -2,6 +2,9 @@
     package="org.nullprotocol.nullgate.testclient"
     android:versionCode="1"
     android:versionName="0.1">
+    <queries>
+        <package android:name="org.nullprotocol.nullgate" />
+    </queries>
     <application
         android:allowBackup="false"
         android:label="NullGate Test Client"
