@@ -4,9 +4,6 @@ import android.content.Context;
 import android.os.SystemClock;
 import org.json.JSONObject;
 import org.nullprotocol.nullgate.protocol.CapabilityPayload;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.FutureTask;
-import java.io.File;
 
 /** Fixed settings-tool implementation; no general shell API or caller-supplied JSON. */
 public final class AndroidSystemThemeBackend implements SystemThemeSeedAdapter.Backend {
@@ -111,24 +108,13 @@ public final class AndroidSystemThemeBackend implements SystemThemeSeedAdapter.B
         command.add("/system/bin/cmd");
         command.add("settings");
         java.util.Collections.addAll(command, arguments);
-        ProcessBuilder builder = new ProcessBuilder(command);
-        Process process = builder.redirectErrorStream(true).start();
-        FutureTask<byte[]> reader = new FutureTask<>(
-                () -> BoundedInput.readAll(process.getInputStream(), 16_386));
-        Thread drain = new Thread(reader, "NullGate-settings-output");
-        drain.setDaemon(true);
-        drain.start();
-        if (!process.waitFor(5, TimeUnit.SECONDS)) {
-            process.destroyForcibly();
-            drain.interrupt();
-            throw new IllegalStateException("fixed settings operation timed out");
-        }
-        byte[] output = reader.get(1, TimeUnit.SECONDS);
+        BoundedProcessRunner.Result result = BoundedProcessRunner.run(command, 5_000L, 16_386);
+        byte[] output = result.output;
         String decoded = new String(output, java.nio.charset.StandardCharsets.UTF_8);
         String stripped = stripLineEndings(decoded);
         if (stripped.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 16_384)
             throw new SecurityException("theme setting exceeds safety bound");
-        return new ProcessResult(process.exitValue(),
+        return new ProcessResult(result.exitCode,
                 decoded);
     }
 

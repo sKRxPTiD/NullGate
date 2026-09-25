@@ -19,8 +19,7 @@
         <activity
             android:name=".ClientRequestActivity"
             android:excludeFromRecents="true"
-            android:exported="true"
-            android:launchMode="singleTop">
+            android:exported="true">
             <intent-filter>
                 <action android:name="org.nullprotocol.nullgate.action.REQUEST_THEME_LEASE" />
                 <action android:name="org.nullprotocol.nullgate.action.REVOKE_LEASE" />

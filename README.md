@@ -45,7 +45,7 @@ artifacts, verifies APK signatures and records SHA-256 checksums, then runs
 simulated device-helper tests. Device tests now run after artifacts exist, so
 the build no longer depends on a previous dist directory.
 
-Current result: **110 host Java checks** (61 broker/security, 30 external-client
+Current result: **114 host Java checks** (65 broker/security, 30 external-client
 policy/state, and 19 test-client response/lifecycle checks) and the stateful device-helper scenario suite pass, including six
 additional final-review regressions.
 These do not execute Android socket, SELinux, Activity lifecycle, app_process,
