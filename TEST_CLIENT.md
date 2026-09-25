@@ -15,6 +15,11 @@ ColorBlendr. Its package is `org.nullprotocol.nullgate.testclient`, version code
 - Receive and persist only the returned lease ID and elapsed-time expiration.
 - Request immediate revocation of that recorded lease.
 
+Controller responses are accepted only when their field set is exact. A grant
+must contain a bounded lease identifier and an expiration that is still in the
+future but no more than 60 seconds away. Revocation is confirmed only by an
+exact decision-only result carrying `REVOKED`.
+
 It receives no root identity, shell, file descriptor, Binder service, arbitrary
 command channel, or direct broker connection.
 

@@ -19,7 +19,6 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import java.security.MessageDigest;
-import java.util.Set;
 
 /** First-party external-app harness. It receives a receipt, never root access. */
 public final class MainActivity extends Activity {
@@ -138,47 +137,51 @@ public final class MainActivity extends Activity {
     }
 
     private void handleLeaseResult(int resultCode, Intent data) {
-        String decision = validatedDecision(data, true);
-        if (resultCode == RESULT_OK && "GRANTED".equals(decision)) {
-            String leaseId = data.getStringExtra(EXTRA_LEASE_ID);
-            long expires = data.getLongExtra(EXTRA_EXPIRES_ELAPSED, -1L);
-            if (leaseId != null && !leaseId.isEmpty()
-                    && expires > SystemClock.elapsedRealtime()
-                    && store().edit().putString(EXTRA_LEASE_ID, leaseId)
-                            .putLong(EXTRA_EXPIRES_ELAPSED, expires).commit()) {
-                status.setText("GRANTED: receipt stored; hard expiry is active.");
-                refreshButtons(true);
-                return;
+        try {
+            String decision = validatedDecision(data, true);
+            if (resultCode == RESULT_OK && "GRANTED".equals(decision)) {
+                TestClientResponsePolicy.Receipt receipt =
+                        TestClientResponsePolicy.requireFreshGrant(
+                                true, data.getExtras().keySet(), decision,
+                                data.getStringExtra(EXTRA_LEASE_ID),
+                                data.getLongExtra(EXTRA_EXPIRES_ELAPSED, -1L),
+                                SystemClock.elapsedRealtime());
+                if (store().edit().putString(EXTRA_LEASE_ID, receipt.leaseId)
+                        .putLong(EXTRA_EXPIRES_ELAPSED, receipt.expiresElapsed).commit()) {
+                    status.setText("GRANTED: receipt stored; hard expiry is active.");
+                    refreshButtons(true);
+                    return;
+                }
+                throw new SecurityException("receipt persistence failed");
             }
-            decision = "DENIED_INVALID_RECEIPT";
+            status.setText("Not granted: " + decision);
+        } catch (SecurityException invalid) {
+            status.setText("Not granted: DENIED_INVALID_RESULT");
         }
-        status.setText("Not granted: " + decision);
         refreshState();
     }
 
     private void handleRevokeResult(int resultCode, Intent data) {
-        String decision = validatedDecision(data, false);
-        if (resultCode == RESULT_OK && "REVOKED".equals(decision)) {
-            store().edit().clear().commit();
-            status.setText("REVOKED: NullGate confirmed cleanup.");
-        } else {
-            status.setText("Revocation not confirmed: " + decision);
+        try {
+            String decision = validatedDecision(data, false);
+            if (TestClientResponsePolicy.isConfirmedRevoke(
+                    resultCode == RESULT_OK, data.getExtras().keySet(), decision)) {
+                store().edit().clear().commit();
+                status.setText("REVOKED: NullGate confirmed cleanup.");
+            } else {
+                status.setText("Revocation not confirmed: " + decision);
+            }
+        } catch (SecurityException invalid) {
+            status.setText("Revocation not confirmed: DENIED_INVALID_RESULT");
         }
         refreshButtons(store().getString(EXTRA_LEASE_ID, null) != null);
     }
 
     private String validatedDecision(Intent data, boolean leaseResponse) {
-        if (data == null || data.getExtras() == null) return "DENIED_MISSING_RESULT";
-        Set<String> keys = data.getExtras().keySet();
-        if (leaseResponse && !(keys.size() == 1 && keys.contains(EXTRA_DECISION))
-                && !(keys.size() == 3 && keys.contains(EXTRA_DECISION)
-                        && keys.contains(EXTRA_LEASE_ID)
-                        && keys.contains(EXTRA_EXPIRES_ELAPSED)))
-            return "DENIED_RESULT_SCHEMA";
-        if (!leaseResponse && !(keys.size() == 1 && keys.contains(EXTRA_DECISION)))
-            return "DENIED_RESULT_SCHEMA";
-        String decision = data.getStringExtra(EXTRA_DECISION);
-        return decision == null || decision.isEmpty() ? "DENIED_MISSING_DECISION" : decision;
+        if (data == null || data.getExtras() == null)
+            throw new SecurityException("missing result");
+        return TestClientResponsePolicy.validateDecision(
+                data.getExtras().keySet(), data.getStringExtra(EXTRA_DECISION), leaseResponse);
     }
 
     private void refreshState() {

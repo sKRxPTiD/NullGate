@@ -20,6 +20,7 @@ command -v zip >/dev/null
 command -v openssl >/dev/null
 
 bash "$BASE_DIR/client/test.sh"
+bash "$BASE_DIR/test-client/test.sh"
 bash "$BASE_DIR/broker/test.sh"
 
 rm -rf "$OUT_DIR" "$DIST_DIR"

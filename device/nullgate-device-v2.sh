@@ -5,16 +5,19 @@ BASE_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 ADB_BIN="${ADB_BIN:-adb}"
 APKSIGNER_BIN="${APKSIGNER_BIN:-${ANDROID_HOME:-$HOME/Android/Sdk}/build-tools/36.0.0/apksigner}"
 APK="$BASE_DIR/dist/NullGate-prototype-debug.apk"
+TEST_CLIENT_APK="$BASE_DIR/dist/NullGate-test-client-debug.apk"
 BROKER="$BASE_DIR/dist/NullGate-broker.jar"
 CERT_FILE="$BASE_DIR/dist/controller-cert-sha256.txt"
 CHECKSUM_FILE="$BASE_DIR/dist/SHA256SUMS"
 PACKAGE="org.nullprotocol.nullgate"
+TEST_CLIENT_PACKAGE="org.nullprotocol.nullgate.testclient"
 BROKER_CLASS="org.nullprotocol.nullgate.broker.NullGateBrokerMain"
 DEVICE_DIR="/data/local/tmp/nullgate"
 DEVICE_BROKER="$DEVICE_DIR/NullGate-broker.jar"
 MUTATION_TOKEN="NULLGATE_MARKER_TEST_V1"
 THEME_MUTATION_TOKEN="NULLGATE_SYSTEM_THEME_V1"
 COLORBLENDR_MUTATION_TOKEN="NULLGATE_COLORBLENDR_SHIZUKU_V1"
+TEST_CLIENT_MUTATION_TOKEN="NULLGATE_TEST_CLIENT_V1"
 SERIAL="${NULLGATE_SERIAL:-}"
 LOG_DIR="${NULLGATE_LOG_DIR:-$BASE_DIR/device/logs}"
 
@@ -22,8 +25,8 @@ die() { echo "NullGate: $*" >&2; exit 1; }
 note() { echo "NullGate: $*"; }
 
 case "${1:-}" in
-  preflight|status|verify-clean|install-controller|deploy|deploy-system-theme|deploy-colorblendr-shizuku|stop|cleanup|recover-marker-runtime|recover-system-theme-runtime) ;;
-  *) die "usage: $0 {preflight|status|verify-clean|install-controller|deploy|deploy-system-theme|deploy-colorblendr-shizuku|stop|cleanup|recover-marker-runtime|recover-system-theme-runtime}" ;;
+  preflight|status|verify-clean|install-controller|install-test-client|deploy|deploy-system-theme|deploy-colorblendr-shizuku|stop|cleanup|recover-marker-runtime|recover-system-theme-runtime) ;;
+  *) die "usage: $0 {preflight|status|verify-clean|install-controller|install-test-client|deploy|deploy-system-theme|deploy-colorblendr-shizuku|stop|cleanup|recover-marker-runtime|recover-system-theme-runtime}" ;;
 esac
 
 command -v "$ADB_BIN" >/dev/null 2>&1 || [[ -x "$ADB_BIN" ]] || die "ADB executable is unavailable"
@@ -38,6 +41,10 @@ case "$1" in
     ;;
   deploy-colorblendr-shizuku)
     [[ "${NULLGATE_MUTATION_TOKEN:-}" == "$COLORBLENDR_MUTATION_TOKEN" ]] || die "device writes are locked; ColorBlendr compatibility acknowledgement required"
+    [[ -n "$SERIAL" ]] || die "device writes require an explicit NULLGATE_SERIAL"
+    ;;
+  install-test-client)
+    [[ "${NULLGATE_MUTATION_TOKEN:-}" == "$TEST_CLIENT_MUTATION_TOKEN" ]] || die "device writes are locked; test-client acknowledgement required"
     [[ -n "$SERIAL" ]] || die "device writes require an explicit NULLGATE_SERIAL"
     ;;
 esac
@@ -56,7 +63,7 @@ require_mutation_authorization() {
 }
 
 require_artifacts() {
-  [[ -s "$APK" && -s "$BROKER" && -s "$CERT_FILE" && -s "$CHECKSUM_FILE" ]]     || die "artifacts missing; run build.sh"
+  [[ -s "$APK" && -s "$TEST_CLIENT_APK" && -s "$BROKER" && -s "$CERT_FILE" && -s "$CHECKSUM_FILE" ]]     || die "artifacts missing; run build.sh"
   (cd "$BASE_DIR/dist" && sha256sum --status -c SHA256SUMS)     || die "artifact checksum verification failed"
   local cert
   cert="$(tr -d '\r\n' < "$CERT_FILE")"
@@ -102,8 +109,8 @@ require_private_runtime() {
 }
 
 installed_apk_path() {
-  local output count path
-  output="$(adb_device shell pm path "$PACKAGE" | tr -d '\r')" || return 1
+  local package_name="${1:-$PACKAGE}" output count path
+  output="$(adb_device shell pm path "$package_name" | tr -d '\r')" || return 1
   count="$(printf '%s\n' "$output" | sed -n 's/^package://p' | wc -l | tr -d '[:space:]')"
   [[ "$count" == 1 ]] || return 1
   path="$(printf '%s\n' "$output" | sed -n 's/^package://p')"
@@ -112,18 +119,22 @@ installed_apk_path() {
 }
 
 verify_installed_signer() {
-  local path temp_dir installed_copy expected actual
-  path="$(installed_apk_path)" || die "controller is not installed as one base APK"
+  verify_package_signer "$PACKAGE" controller
+}
+
+verify_package_signer() {
+  local package_name="$1" label="$2" path temp_dir installed_copy expected actual
+  path="$(installed_apk_path "$package_name")" || die "$label is not installed as one base APK"
   temp_dir="$(mktemp -d)"
   installed_copy="$temp_dir/controller.apk"
   if ! adb_device pull "$path" "$installed_copy" >/dev/null; then
     rm -rf -- "$temp_dir"
-    die "could not copy installed controller for signer verification"
+    die "could not copy installed $label for signer verification"
   fi
   expected="$(tr -d '\r\n' < "$CERT_FILE")"
   actual="$("$APKSIGNER_BIN" verify --print-certs "$installed_copy"     | sed -n 's/^Signer #[0-9][0-9]* certificate SHA-256 digest: //p')"
   rm -rf -- "$temp_dir"
-  [[ "$actual" =~ ^[0-9a-f]{64}$ && "$actual" == "$expected" ]]     || die "installed controller signer does not match the broker pin"
+  [[ "$actual" =~ ^[0-9a-f]{64}$ && "$actual" == "$expected" ]]     || die "installed $label signer does not match the controller pin"
 }
 
 broker_pid() {
@@ -183,6 +194,27 @@ install_controller() {
   adb_device install "$APK" >/dev/null || die "controller installation failed"
   verify_installed_signer
   note "controller installed and signer verified"
+}
+
+install_test_client() {
+  require_mutation_authorization "$TEST_CLIENT_MUTATION_TOKEN"
+  require_artifacts
+  platform_preflight
+  verify_installed_signer
+  require_no_broker
+  [[ "$(runtime_state)" == ABSENT ]] || die "test-client installation requires an absent broker runtime"
+  local package_output
+  package_output="$(adb_device shell pm list packages --user 0 "$TEST_CLIENT_PACKAGE" | tr -d '\r')"
+  if [[ -n "$package_output" ]]; then
+    installed_apk_path "$TEST_CLIENT_PACKAGE" >/dev/null \
+      || die "test-client package exists in an unsupported or ambiguous layout"
+    verify_package_signer "$TEST_CLIENT_PACKAGE" "test client"
+    adb_device install -r "$TEST_CLIENT_APK" >/dev/null || die "test-client update failed"
+  else
+    adb_device install "$TEST_CLIENT_APK" >/dev/null || die "test-client installation failed"
+  fi
+  verify_package_signer "$TEST_CLIENT_PACKAGE" "test client"
+  note "paired test client installed and signer verified; no broker was launched"
 }
 
 deploy_with_mode() {
@@ -406,6 +438,7 @@ case "$1" in
   status) status ;;
   verify-clean) verify_clean ;;
   install-controller) install_controller ;;
+  install-test-client) install_test_client ;;
   deploy) deploy ;;
   deploy-system-theme) deploy_system_theme ;;
   deploy-colorblendr-shizuku) deploy_colorblendr_shizuku ;;

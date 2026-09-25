@@ -3,6 +3,7 @@
 /dist/
 /broker/build-test/
 /client/build-test/
+/test-client/build-test/
 
 # Local signing identities: never commit these
 /keys/

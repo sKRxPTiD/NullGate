@@ -45,8 +45,8 @@ artifacts, verifies APK signatures and records SHA-256 checksums, then runs
 simulated device-helper tests. Device tests now run after artifacts exist, so
 the build no longer depends on a previous dist directory.
 
-Current result: **79 host Java checks** (57 broker/security plus 22 external-client
-policy checks) and the stateful device-helper scenario suite pass, including six
+Current result: **88 host Java checks** (57 broker/security, 22 external-client
+policy, and 9 test-client response checks) and the stateful device-helper scenario suite pass, including six
 additional final-review regressions.
 These do not execute Android socket, SELinux, Activity lifecycle, app_process,
 filesystem or shutdown behavior. No Android emulator/instrumentation test has
@@ -160,6 +160,7 @@ official package is present.
 - `BROKER_CONTRACT.md` defines the root-side protocol and invariants.
 - `CLIENT_INTEGRATION.md` defines the Android caller contract.
 - `TEST_CLIENT.md` defines the first-party external-app harness and limits.
+- `DEPLOYMENT_GATE.md` defines the supervised PiXi test and stop conditions.
 - `NATIVE_CAPABILITY_CONTRACT.md` defines the first typed native capability.
 - `THREAT_MODEL.md` and `SECURITY_AUDIT.md` record the current security boundary.
 - `integrations/patches/` contains the reviewed ColorBlendr integration patch.

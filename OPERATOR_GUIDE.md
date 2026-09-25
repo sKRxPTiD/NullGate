@@ -8,6 +8,11 @@ exact restoration. A separate ColorBlendr compatibility mode is built and
 host-tested for the pinned official Shizuku release, but it has not passed its
 PiXi deployment gate and must not be treated as operational yet.
 
+The separate NullGate Test Client is also built but not installed. Its guarded
+installer uses the dedicated `NULLGATE_TEST_CLIENT_V1` acknowledgement and
+refuses installation while a broker runtime exists. The ordinary marker-test
+token cannot install it. See `DEPLOYMENT_GATE.md` before any device use.
+
 ## Normal session
 
 1. Plug PiXi into DoloWOLF and unlock the phone.

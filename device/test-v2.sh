@@ -10,7 +10,7 @@ trap 'rm -rf -- "$TEST_DIR"' EXIT
 STATE="$TEST_DIR/state"
 
 set_state() {
-  printf 'installed=%s runtime=%s broker=%s running=%s pid_receipt=%s leases=%s unknown=%s\n'     "${1:-0}" "${2:-0}" "${3:-0}" "${4:-0}" "${5:-0}" "${6:-0}" "${7:-0}" > "$STATE"
+  printf 'installed=%s runtime=%s broker=%s running=%s pid_receipt=%s leases=%s unknown=%s test_client=%s\n'     "${1:-0}" "${2:-0}" "${3:-0}" "${4:-0}" "${5:-0}" "${6:-0}" "${7:-0}" "${8:-0}" > "$STATE"
 }
 
 run_helper() {
@@ -38,6 +38,26 @@ run_colorblendr_helper() {
     "$HELPER" "$action"
 }
 
+run_test_client_helper() {
+  local scenario="$1" action="$2"
+  FAKE_STATE_FILE="$STATE" FAKE_SCENARIO="$scenario" \
+    FAKE_CERT_FILE="$BASE_DIR/dist/controller-cert-sha256.txt" \
+    FAKE_BROKER_FILE="$BASE_DIR/dist/NullGate-broker.jar" \
+    NULLGATE_SERIAL=PIXI_TEST_SERIAL NULLGATE_MUTATION_TOKEN=NULLGATE_TEST_CLIENT_V1 \
+    NULLGATE_LOG_DIR="$TEST_DIR/logs" ADB_BIN="$FAKE_ADB" APKSIGNER_BIN="$FAKE_SIGNER" \
+    "$HELPER" "$action"
+}
+
+expect_test_client_failure() {
+  local scenario="$1" expected="$2" output
+  if output="$(run_test_client_helper "$scenario" install-test-client 2>&1)"; then
+    echo "expected test-client installation failure: $scenario" >&2; exit 1
+  fi
+  [[ "$output" == *"$expected"* ]] || {
+    echo "unexpected test-client failure for $scenario: $output" >&2; exit 1;
+  }
+}
+
 expect_failure() {
   local scenario="$1" action="$2" expected="$3" output
   if output="$(run_helper "$scenario" "$action" 2>&1)"; then
@@ -53,6 +73,18 @@ if output="$(FAKE_STATE_FILE="$STATE" FAKE_SCENARIO=ready   FAKE_CERT_FILE="$BAS
   echo "mutation authorization was not required" >&2; exit 1
 fi
 [[ "$output" == *"device writes are locked"* ]]
+
+set_state 1
+if output="$(run_helper ready install-test-client 2>&1)"; then
+  echo "marker token enabled test-client installation" >&2; exit 1
+fi
+[[ "$output" == *"test-client acknowledgement required"* ]]
+run_test_client_helper ready install-test-client >/dev/null
+[[ "$(cat "$STATE")" == "installed=1 runtime=0 broker=0 running=0 pid_receipt=0 leases=0 unknown=0 test_client=1" ]]
+set_state 1 1 1
+expect_test_client_failure ready "requires an absent broker runtime"
+set_state
+expect_test_client_failure ready "controller is not installed"
 
 set_state 1
 if output="$(run_helper ready deploy-system-theme 2>&1)"; then
@@ -122,7 +154,7 @@ set_state 1 1 1 0 0
 expect_failure cleanup-fail cleanup "runtime cleanup failed"
 set_state 1 1 1 1 1
 run_helper stale-receipt stop >/dev/null
-[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=0 leases=0 unknown=0" ]]
+[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=0 leases=0 unknown=0 test_client=0" ]]
 set_state 1 1 1 1 1
 expect_failure term-fail stop "SIGTERM failed"
 set_state 1
@@ -138,7 +170,7 @@ run_helper ready recover-marker-runtime >/dev/null
 run_helper ready verify-clean >/dev/null
 set_state 1 1 1 0 1 1
 expect_failure marker-invalid recover-marker-runtime "content failed validation"
-[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0" ]]
+[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0" ]]
 set_state 1 1 1 0 1 1
 expect_failure marker-unsafe recover-marker-runtime "ownership or mode"
 set_state 1 1 1 0 1 1
@@ -150,11 +182,11 @@ set_state 1 0 0 1 0
 expect_failure ready verify-clean "broker is still running"
 set_state 1 1 1 0 1 1
 expect_failure inventory-fail recover-marker-runtime "UNKNOWN"
-[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0" ]]
+[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0" ]]
 expect_failure proc-fail recover-marker-runtime "UNKNOWN"
-[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0" ]]
+[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0" ]]
 expect_failure reused-pid recover-marker-runtime "recorded PID still exists"
-[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0" ]]
+[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0" ]]
 set_state 1 1 1 1 1
 expect_failure proc-fail stop "UNKNOWN"
-echo "NullGate device harness scenarios passed, including six additional final-review regressions"
+echo "NullGate device harness scenarios passed, including locked test-client installation and six final-review regressions"
