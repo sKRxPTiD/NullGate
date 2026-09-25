@@ -320,8 +320,9 @@ public final class ClientRequestActivity extends Activity {
     private boolean saveSubmitting(LeaseRequest lease, long generation) {
         synchronized (STATE_LOCK) {
             SharedPreferences prefs = store();
-            if (prefs.getString("lease_id", null) != null
-                    || prefs.getLong("approval_generation", 0L) != generation) return false;
+            if (!ExternalLeaseStatePolicy.canReserveSubmission(
+                    prefs.getString("lease_id", null) != null, generation,
+                    prefs.getLong("approval_generation", 0L))) return false;
             return prefs.edit().putString("lease_id", lease.id)
                     .putString("lease_nonce", lease.nonce)
                     .putString("client_package", approved.clientPackage)

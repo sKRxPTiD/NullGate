@@ -20,6 +20,11 @@ public final class ExternalLeaseStatePolicy {
                 && capturedGeneration == currentGeneration;
     }
 
+    public static boolean canReserveSubmission(boolean hasRecord,
+            long capturedGeneration, long currentGeneration) {
+        return !hasRecord && capturedGeneration == currentGeneration;
+    }
+
     public static boolean canDeliverGrant(String capturedLeaseId, String currentLeaseId,
             String phase, long capturedGeneration, long currentGeneration,
             long capturedExpiry, long currentExpiry, long nowElapsed) {

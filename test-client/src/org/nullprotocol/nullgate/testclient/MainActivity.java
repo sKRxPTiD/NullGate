@@ -166,33 +166,30 @@ public final class MainActivity extends Activity {
     }
 
     private void handleLeaseResult(int resultCode, Intent data) {
-        try {
-            String decision = validatedDecision(data, true);
-            if (resultCode == RESULT_OK && "GRANTED".equals(decision)) {
-                TestClientResponsePolicy.Receipt receipt =
-                        TestClientResponsePolicy.requireFreshGrant(
-                                true, data.getExtras().keySet(), decision,
-                                data.getStringExtra(EXTRA_LEASE_ID),
-                                data.getLongExtra(EXTRA_EXPIRES_ELAPSED, -1L),
-                                SystemClock.elapsedRealtime());
-                if (store().edit().putString(EXTRA_LEASE_ID, receipt.leaseId)
-                        .putLong(EXTRA_EXPIRES_ELAPSED, receipt.expiresElapsed)
+        if (data != null && data.getExtras() != null) {
+            String decision = data.getStringExtra(EXTRA_DECISION);
+            TestClientResponsePolicy.Evaluation evaluated =
+                    TestClientResponsePolicy.evaluateLeaseResult(
+                            resultCode == RESULT_OK, resultCode == RESULT_CANCELED,
+                            data.getExtras().keySet(), decision,
+                            data.getStringExtra(EXTRA_LEASE_ID),
+                            data.getLongExtra(EXTRA_EXPIRES_ELAPSED, -1L),
+                            SystemClock.elapsedRealtime());
+            if (evaluated.outcome == TestClientResponsePolicy.Outcome.GRANT) {
+                if (store().edit().putString(EXTRA_LEASE_ID, evaluated.receipt.leaseId)
+                        .putLong(EXTRA_EXPIRES_ELAPSED, evaluated.receipt.expiresElapsed)
                         .putString("phase", TestClientStatePolicy.ACTIVE).commit()) {
                     status.setText("GRANTED: receipt stored; expiry watchdog is active.");
                     refreshButtons(TestClientStatePolicy.ACTIVE);
                     return;
                 }
-                throw new SecurityException("receipt persistence failed");
             }
-            if (TestClientResponsePolicy.isConfirmedCleanDenial(
-                    resultCode == RESULT_CANCELED, data.getExtras().keySet(), decision)
+            if (evaluated.outcome == TestClientResponsePolicy.Outcome.CLEAN
                     && store().edit().clear().commit()) {
                 status.setText("Not granted: " + decision);
                 refreshButtons(TestClientStatePolicy.CLEAN);
                 return;
             }
-        } catch (SecurityException invalid) {
-            // The pre-dispatch PENDING marker remains unless UNKNOWN is durably recorded.
         }
         store().edit().putString("phase", TestClientStatePolicy.UNKNOWN).commit();
         status.setText("Result is uncertain. Reconcile before requesting again.");
@@ -222,33 +219,23 @@ public final class MainActivity extends Activity {
     }
 
     private void handleReconcileResult(int resultCode, Intent data) {
-        try {
-            String decision = validatedDecision(data, true);
-            if (resultCode == RESULT_OK && "GRANTED".equals(decision)) {
-                TestClientResponsePolicy.Receipt receipt =
-                        TestClientResponsePolicy.requireFreshGrant(true,
-                                data.getExtras().keySet(), decision,
-                                data.getStringExtra(EXTRA_LEASE_ID),
-                                data.getLongExtra(EXTRA_EXPIRES_ELAPSED, -1L),
-                                SystemClock.elapsedRealtime());
-                if (store().edit().putString(EXTRA_LEASE_ID, receipt.leaseId)
-                        .putLong(EXTRA_EXPIRES_ELAPSED, receipt.expiresElapsed)
-                        .putString("phase", TestClientStatePolicy.ACTIVE).commit()) {
-                    status.setText("Reconciled: active lease receipt recovered.");
-                    refreshButtons(TestClientStatePolicy.ACTIVE);
-                    return;
-                }
-                throw new SecurityException("reconciled receipt persistence failed");
-            }
-            if (TestClientResponsePolicy.isConfirmedCleanReconciliation(
-                    resultCode == RESULT_CANCELED, data.getExtras().keySet(), decision)) {
+        if (data != null && data.getExtras() != null) {
+            String decision = data.getStringExtra(EXTRA_DECISION);
+            TestClientResponsePolicy.Evaluation evaluated =
+                    TestClientResponsePolicy.evaluateReconcileResult(
+                            resultCode == RESULT_OK, resultCode == RESULT_CANCELED,
+                            data.getExtras().keySet(), decision,
+                            data.getStringExtra(EXTRA_LEASE_ID),
+                            data.getLongExtra(EXTRA_EXPIRES_ELAPSED, -1L),
+                            SystemClock.elapsedRealtime());
+            if (evaluated.outcome == TestClientResponsePolicy.Outcome.CLEAN) {
                 if (store().edit().clear().commit()) {
                     status.setText("Reconciled clean: no active external lease remains.");
                     refreshButtons(TestClientStatePolicy.CLEAN);
                     return;
                 }
             }
-        } catch (SecurityException invalid) { }
+        }
         store().edit().putString("phase", TestClientStatePolicy.UNKNOWN).commit();
         status.setText("Reconciliation is still uncertain. Do not request another lease.");
         refreshButtons(TestClientStatePolicy.UNKNOWN);

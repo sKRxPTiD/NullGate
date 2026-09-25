@@ -7,6 +7,14 @@ import org.nullprotocol.nullgate.protocol.ExternalClientContract;
 
 /** Pure fail-closed validation for controller Activity results. */
 public final class TestClientResponsePolicy {
+    public enum Outcome { GRANT, CLEAN, UNKNOWN }
+    public static final class Evaluation {
+        public final Outcome outcome;
+        public final Receipt receipt;
+        private Evaluation(Outcome outcome, Receipt receipt) {
+            this.outcome = outcome; this.receipt = receipt;
+        }
+    }
     private static final Set<String> CONFIRMED_CLEAN_DENIALS = new HashSet<>(Arrays.asList(
             "DENIED_BY_USER", "DENIED_CALLER_CHANGED", "DENIED_RECOVERY_RECORD_FAILED",
             "DENIED_INVALID_CLIENT_REQUEST", "INVALID_TIME_WINDOW",
@@ -76,5 +84,28 @@ public final class TestClientResponsePolicy {
         return resultCanceled && ExternalClientContract.hasExactDecisionKeys(keys)
                 && ("NOT_FOUND".equals(decision)
                     || "REVOKED_AFTER_UNCERTAIN_RESULT".equals(decision));
+    }
+
+    public static Evaluation evaluateLeaseResult(boolean resultOk, boolean resultCanceled,
+            Set<String> keys, String decision, String leaseId, long expiresElapsed,
+            long nowElapsed) {
+        try {
+            if (resultOk && "GRANTED".equals(decision))
+                return new Evaluation(Outcome.GRANT, requireFreshGrant(true, keys,
+                        decision, leaseId, expiresElapsed, nowElapsed));
+            if (isConfirmedCleanDenial(resultCanceled, keys, decision))
+                return new Evaluation(Outcome.CLEAN, null);
+        } catch (SecurityException invalid) { }
+        return new Evaluation(Outcome.UNKNOWN, null);
+    }
+
+    public static Evaluation evaluateReconcileResult(boolean resultOk,
+            boolean resultCanceled, Set<String> keys, String decision, String leaseId,
+            long expiresElapsed, long nowElapsed) {
+        try {
+            if (isConfirmedCleanReconciliation(resultCanceled, keys, decision))
+                return new Evaluation(Outcome.CLEAN, null);
+        } catch (SecurityException invalid) { }
+        return new Evaluation(Outcome.UNKNOWN, null);
     }
 }

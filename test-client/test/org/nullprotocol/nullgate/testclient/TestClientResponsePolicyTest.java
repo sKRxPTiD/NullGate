@@ -30,6 +30,27 @@ public final class TestClientResponsePolicyTest {
                 true, decision, "REVOKED_AFTER_UNCERTAIN_RESULT"));
         check(!TestClientResponsePolicy.isConfirmedCleanReconciliation(
                 true, decision, "CLEANUP_FAILED"));
+        check(TestClientResponsePolicy.evaluateLeaseResult(false, true, decision,
+                "DENIED_BY_USER", null, -1L, 10_000L).outcome
+                == TestClientResponsePolicy.Outcome.CLEAN);
+        check(TestClientResponsePolicy.evaluateLeaseResult(false, true, decision,
+                "CLEANUP_FAILED", null, -1L, 10_000L).outcome
+                == TestClientResponsePolicy.Outcome.UNKNOWN);
+        check(TestClientResponsePolicy.evaluateLeaseResult(false, true, decision,
+                "FUTURE_UNKNOWN_CODE", null, -1L, 10_000L).outcome
+                == TestClientResponsePolicy.Outcome.UNKNOWN);
+        check(TestClientResponsePolicy.evaluateLeaseResult(true, false, decision,
+                "DENIED_BY_USER", null, -1L, 10_000L).outcome
+                == TestClientResponsePolicy.Outcome.UNKNOWN);
+        check(TestClientResponsePolicy.evaluateReconcileResult(false, true, decision,
+                "NOT_FOUND", null, -1L, 10_000L).outcome
+                == TestClientResponsePolicy.Outcome.CLEAN);
+        check(TestClientResponsePolicy.evaluateLeaseResult(true, false, receipt,
+                "GRANTED", LEASE, 70_000L, 10_000L).outcome
+                == TestClientResponsePolicy.Outcome.GRANT);
+        check(TestClientResponsePolicy.evaluateReconcileResult(true, false, receipt,
+                "GRANTED", LEASE, 70_000L, 10_000L).outcome
+                == TestClientResponsePolicy.Outcome.UNKNOWN);
         denies(() -> TestClientResponsePolicy.validateDecision(
                 keys(TestClientResponsePolicy.EXTRA_DECISION, "command"), "GRANTED", true));
         denies(() -> TestClientResponsePolicy.validateDecision(decision, "", true));
@@ -41,7 +62,7 @@ public final class TestClientResponsePolicyTest {
                 true, receipt, "GRANTED", LEASE, 10_000L, 10_000L));
         denies(() -> TestClientResponsePolicy.requireFreshGrant(
                 true, receipt, "GRANTED", LEASE, 70_001L, 10_000L));
-        System.out.println("NullGate test-client response checks: 15 passed");
+        System.out.println("NullGate test-client response checks: 22 passed");
     }
 
     private static Set<String> keys(String... values) {
