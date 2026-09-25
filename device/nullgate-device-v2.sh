@@ -4,6 +4,7 @@ set -euo pipefail
 BASE_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 ADB_BIN="${ADB_BIN:-adb}"
 APKSIGNER_BIN="${APKSIGNER_BIN:-${ANDROID_HOME:-$HOME/Android/Sdk}/build-tools/36.0.0/apksigner}"
+AAPT2_BIN="${AAPT2_BIN:-${ANDROID_HOME:-$HOME/Android/Sdk}/build-tools/36.0.0/aapt2}"
 APK="$BASE_DIR/dist/NullGate-prototype-debug.apk"
 TEST_CLIENT_APK="$BASE_DIR/dist/NullGate-test-client-debug.apk"
 BROKER="$BASE_DIR/dist/NullGate-broker.jar"
@@ -11,6 +12,8 @@ CERT_FILE="$BASE_DIR/dist/controller-cert-sha256.txt"
 CHECKSUM_FILE="$BASE_DIR/dist/SHA256SUMS"
 PACKAGE="org.nullprotocol.nullgate"
 TEST_CLIENT_PACKAGE="org.nullprotocol.nullgate.testclient"
+CONTROLLER_VERSION_CODE="1"
+TEST_CLIENT_VERSION_CODE="1"
 BROKER_CLASS="org.nullprotocol.nullgate.broker.NullGateBrokerMain"
 DEVICE_DIR="/data/local/tmp/nullgate"
 DEVICE_BROKER="$DEVICE_DIR/NullGate-broker.jar"
@@ -30,6 +33,7 @@ case "${1:-}" in
 esac
 
 command -v "$ADB_BIN" >/dev/null 2>&1 || [[ -x "$ADB_BIN" ]] || die "ADB executable is unavailable"
+[[ -x "$AAPT2_BIN" ]] || die "aapt2 executable is unavailable"
 case "$1" in
   install-controller|deploy|stop|cleanup|recover-marker-runtime)
     [[ "${NULLGATE_MUTATION_TOKEN:-}" == "$MUTATION_TOKEN" ]] || die "device writes are locked; marker-test acknowledgement required"
@@ -146,6 +150,15 @@ verify_local_apk_signer() {
     || die "local $label signer does not match the controller pin"
 }
 
+verify_local_apk_identity() {
+  local apk="$1" expected_package="$2" expected_version="$3" label="$4"
+  local badging package_name version_code
+  badging="$("$AAPT2_BIN" dump badging "$apk" | sed -n '1p')" || die "could not inspect local $label identity"
+  package_name="$(printf '%s\n' "$badging" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")"
+  version_code="$(printf '%s\n' "$badging" | sed -n "s/^package: .* versionCode='\([^']*\)'.*/\1/p")"
+  [[ "$package_name" == "$expected_package" && "$version_code" == "$expected_version" ]] || die "local $label package identity or version is not the reviewed build"
+}
+
 broker_pid() {
   adb_device shell "if test -L $DEVICE_DIR/broker.pid; then echo SYMLINK; elif test -f $DEVICE_DIR/broker.pid; then cat $DEVICE_DIR/broker.pid; elif test -e $DEVICE_DIR/broker.pid; then echo OTHER; else echo ABSENT; fi"     | tr -d '\r\n'
 }
@@ -190,6 +203,7 @@ install_controller() {
   require_mutation_authorization
   require_artifacts
   platform_preflight
+  verify_local_apk_identity "$APK" "$PACKAGE" "$CONTROLLER_VERSION_CODE" controller
   verify_local_apk_signer "$APK" controller
   local package_output
   package_output="$(adb_device shell pm list packages --user 0 "$PACKAGE" | tr -d '\r')"
@@ -210,6 +224,7 @@ install_test_client() {
   require_mutation_authorization "$TEST_CLIENT_MUTATION_TOKEN"
   require_artifacts
   platform_preflight
+  verify_local_apk_identity "$TEST_CLIENT_APK" "$TEST_CLIENT_PACKAGE" "$TEST_CLIENT_VERSION_CODE" "test client"
   verify_local_apk_signer "$TEST_CLIENT_APK" "test client"
   verify_installed_signer
   require_no_broker

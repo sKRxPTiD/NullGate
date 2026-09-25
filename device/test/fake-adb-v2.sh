@@ -25,7 +25,11 @@ shift 2
 
 if [[ "${1:-}" == pull ]]; then
   if [[ "${2:-}" == /data/local/tmp/nullgate/theme.snapshot && "$theme_snapshot" == 1 ]]; then
-    printf 'VALUE\n{"android.theme.customization.color_source":"home_wallpaper"}\n' > "$3"
+    if [[ "$scenario" == theme-recovery-null ]]; then
+      printf 'NULL\n' > "$3"
+    else
+      printf 'VALUE\n{"android.theme.customization.color_source":"home_wallpaper"}\n' > "$3"
+    fi
     exit 0
   fi
   [[ "$installed" == 1 || "$test_client" == 1 || "${2:-}" == */broker.log ]] || exit 1
@@ -152,12 +156,17 @@ case "$request" in
     true ;;
   "shell if test -L /data/local/tmp/nullgate/theme.snapshot; then echo SYMLINK; elif test -f /data/local/tmp/nullgate/theme.snapshot; then stat -c 'FILE:%u:%a:%s' /data/local/tmp/nullgate/theme.snapshot; elif test -e /data/local/tmp/nullgate/theme.snapshot; then echo OTHER; else echo ABSENT; fi")
     if [[ "$scenario" == theme-recovery-unsafe ]]; then echo SYMLINK
+    elif [[ "$theme_snapshot" == 1 && "$scenario" == theme-recovery-null ]]; then echo FILE:0:600:5
     elif [[ "$theme_snapshot" == 1 ]]; then echo FILE:0:600:70
     else echo ABSENT; fi ;;
   "shell cmd settings put secure theme_customization_overlay_packages '{\"android.theme.customization.color_source\":\"home_wallpaper\"}'")
-    [[ "$scenario" == theme-recovery && "$theme_snapshot" == 1 ]] ;;
+    [[ ("$scenario" == theme-recovery || "$scenario" == theme-recovery-readback-fail) && "$theme_snapshot" == 1 ]] ;;
+  "shell cmd settings delete secure theme_customization_overlay_packages")
+    [[ "$scenario" == theme-recovery-null && "$theme_snapshot" == 1 ]] ;;
   "shell settings get secure theme_customization_overlay_packages")
-    echo '{"android.theme.customization.color_source":"home_wallpaper"}' ;;
+    if [[ "$scenario" == theme-recovery-null ]]; then echo null
+    elif [[ "$scenario" == theme-recovery-readback-fail ]]; then echo '{"mismatch":true}'
+    else echo '{"android.theme.customization.color_source":"home_wallpaper"}'; fi ;;
   "shell rm -f /data/local/tmp/nullgate/theme.snapshot")
     theme_snapshot=0; save ;;
   "shell test ! -e /data/local/tmp/nullgate/leases || rmdir /data/local/tmp/nullgate/leases")

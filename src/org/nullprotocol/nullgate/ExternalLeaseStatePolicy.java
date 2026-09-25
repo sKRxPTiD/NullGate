@@ -13,9 +13,19 @@ public final class ExternalLeaseStatePolicy {
                 && expectedUid == recordedUid;
     }
 
-    public static boolean canReturnDelayedGrant(String capturedLeaseId,
-            String currentLeaseId, String phase, long expiresElapsed, long nowElapsed) {
+    public static boolean canSettle(String capturedLeaseId, String currentLeaseId,
+            String phase, long capturedGeneration, long currentGeneration) {
         return capturedLeaseId != null && capturedLeaseId.equals(currentLeaseId)
-                && "ACTIVE".equals(phase) && expiresElapsed > nowElapsed;
+                && "SUBMITTING".equals(phase)
+                && capturedGeneration == currentGeneration;
+    }
+
+    public static boolean canDeliverGrant(String capturedLeaseId, String currentLeaseId,
+            String phase, long capturedGeneration, long currentGeneration,
+            long capturedExpiry, long currentExpiry, long nowElapsed) {
+        return capturedLeaseId != null && capturedLeaseId.equals(currentLeaseId)
+                && "ACTIVE".equals(phase)
+                && capturedGeneration == currentGeneration
+                && capturedExpiry == currentExpiry && currentExpiry > nowElapsed;
     }
 }

@@ -24,12 +24,23 @@ public final class BoundedProcessRunner {
         Thread drain = new Thread(reader, "NullGate-command-output");
         drain.setDaemon(true);
         drain.start();
-        if (!process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS)) {
-            process.destroyForcibly();
-            process.waitFor(1, TimeUnit.SECONDS);
+        try {
+            if (!process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS)) {
+                process.destroyForcibly();
+                if (!process.waitFor(1, TimeUnit.SECONDS))
+                    throw new IllegalStateException("timed-out command could not be terminated");
+                throw new IllegalStateException("fixed command timed out");
+            }
+            return new Result(process.exitValue(), reader.get(1, TimeUnit.SECONDS));
+        } finally {
+            if (process.isAlive()) {
+                process.destroyForcibly();
+                process.waitFor(1, TimeUnit.SECONDS);
+            }
             reader.cancel(true);
-            throw new IllegalStateException("fixed command timed out");
+            try { process.getInputStream().close(); } catch (Exception ignored) { }
+            try { process.getOutputStream().close(); } catch (Exception ignored) { }
+            try { process.getErrorStream().close(); } catch (Exception ignored) { }
         }
-        return new Result(process.exitValue(), reader.get(1, TimeUnit.SECONDS));
     }
 }

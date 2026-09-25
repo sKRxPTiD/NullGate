@@ -5,6 +5,7 @@ BASE_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 HELPER="$BASE_DIR/device/nullgate-device-v2.sh"
 FAKE_ADB="$BASE_DIR/device/test/fake-adb-v2.sh"
 FAKE_SIGNER="$BASE_DIR/device/test/fake-apksigner.sh"
+FAKE_AAPT2="$BASE_DIR/device/test/fake-aapt2.sh"
 TEST_DIR="$(mktemp -d)"
 trap 'rm -rf -- "$TEST_DIR"' EXIT
 STATE="$TEST_DIR/state"
@@ -15,7 +16,7 @@ set_state() {
 
 run_helper() {
   local scenario="$1" action="$2"
-  FAKE_STATE_FILE="$STATE" FAKE_SCENARIO="$scenario"     FAKE_CERT_FILE="$BASE_DIR/dist/controller-cert-sha256.txt"     FAKE_BROKER_FILE="$BASE_DIR/dist/NullGate-broker.jar"     NULLGATE_SERIAL=PIXI_TEST_SERIAL NULLGATE_MUTATION_TOKEN=NULLGATE_MARKER_TEST_V1     NULLGATE_LOG_DIR="$TEST_DIR/logs"     ADB_BIN="$FAKE_ADB" APKSIGNER_BIN="$FAKE_SIGNER" "$HELPER" "$action"
+  FAKE_STATE_FILE="$STATE" FAKE_SCENARIO="$scenario"     FAKE_CERT_FILE="$BASE_DIR/dist/controller-cert-sha256.txt"     FAKE_BROKER_FILE="$BASE_DIR/dist/NullGate-broker.jar"     NULLGATE_SERIAL=PIXI_TEST_SERIAL NULLGATE_MUTATION_TOKEN=NULLGATE_MARKER_TEST_V1     NULLGATE_LOG_DIR="$TEST_DIR/logs"     ADB_BIN="$FAKE_ADB" APKSIGNER_BIN="$FAKE_SIGNER" AAPT2_BIN="$FAKE_AAPT2" "$HELPER" "$action"
 }
 
 run_theme_helper() {
@@ -24,7 +25,7 @@ run_theme_helper() {
     FAKE_CERT_FILE="$BASE_DIR/dist/controller-cert-sha256.txt" \
     FAKE_BROKER_FILE="$BASE_DIR/dist/NullGate-broker.jar" \
     NULLGATE_SERIAL=PIXI_TEST_SERIAL NULLGATE_MUTATION_TOKEN=NULLGATE_SYSTEM_THEME_V1 \
-    NULLGATE_LOG_DIR="$TEST_DIR/logs" ADB_BIN="$FAKE_ADB" APKSIGNER_BIN="$FAKE_SIGNER" \
+    NULLGATE_LOG_DIR="$TEST_DIR/logs" ADB_BIN="$FAKE_ADB" APKSIGNER_BIN="$FAKE_SIGNER" AAPT2_BIN="$FAKE_AAPT2" \
     "$HELPER" "$action"
 }
 
@@ -34,7 +35,7 @@ run_colorblendr_helper() {
     FAKE_CERT_FILE="$BASE_DIR/dist/controller-cert-sha256.txt" \
     FAKE_BROKER_FILE="$BASE_DIR/dist/NullGate-broker.jar" \
     NULLGATE_SERIAL=PIXI_TEST_SERIAL NULLGATE_MUTATION_TOKEN=NULLGATE_COLORBLENDR_SHIZUKU_V1 \
-    NULLGATE_LOG_DIR="$TEST_DIR/logs" ADB_BIN="$FAKE_ADB" APKSIGNER_BIN="$FAKE_SIGNER" \
+    NULLGATE_LOG_DIR="$TEST_DIR/logs" ADB_BIN="$FAKE_ADB" APKSIGNER_BIN="$FAKE_SIGNER" AAPT2_BIN="$FAKE_AAPT2" \
     "$HELPER" "$action"
 }
 
@@ -44,7 +45,7 @@ run_test_client_helper() {
     FAKE_CERT_FILE="$BASE_DIR/dist/controller-cert-sha256.txt" \
     FAKE_BROKER_FILE="$BASE_DIR/dist/NullGate-broker.jar" \
     NULLGATE_SERIAL=PIXI_TEST_SERIAL NULLGATE_MUTATION_TOKEN=NULLGATE_TEST_CLIENT_V1 \
-    NULLGATE_LOG_DIR="$TEST_DIR/logs" ADB_BIN="$FAKE_ADB" APKSIGNER_BIN="$FAKE_SIGNER" \
+    NULLGATE_LOG_DIR="$TEST_DIR/logs" ADB_BIN="$FAKE_ADB" APKSIGNER_BIN="$FAKE_SIGNER" AAPT2_BIN="$FAKE_AAPT2" \
     "$HELPER" "$action"
 }
 
@@ -143,6 +144,12 @@ run_helper ready verify-clean >/dev/null
 set_state
 expect_failure wrong-signer install-controller "local controller signer does not match"
 [[ "$(cat "$STATE")" == *"installed=0"* ]]
+set_state
+expect_failure wrong-local-package install-controller "package identity or version"
+[[ "$(cat "$STATE")" == *"installed=0"* ]]
+set_state
+expect_failure wrong-local-version install-controller "package identity or version"
+[[ "$(cat "$STATE")" == *"installed=0"* ]]
 
 set_state 1
 expect_failure hash-mismatch deploy "digest mismatch"
@@ -194,6 +201,21 @@ set_state 1 1 1 0 0 0 0 0 1
 run_theme_helper theme-recovery recover-system-theme-runtime >/dev/null
 run_theme_helper ready verify-clean >/dev/null
 set_state 1 1 1 0 0 0 0 0 1
+run_theme_helper theme-recovery-null recover-system-theme-runtime >/dev/null
+run_theme_helper ready verify-clean >/dev/null
+set_state 1 1 1 0 0 0 0 0 1
+if output="$(run_theme_helper theme-recovery-readback-fail recover-system-theme-runtime 2>&1)"; then
+  echo "mismatched theme recovery readback was accepted" >&2; exit 1
+fi
+[[ "$output" == *"was not exact"* ]]
+[[ "$(cat "$STATE")" == *"theme_snapshot=1"* ]]
+set_state 1 1 1 0 0 0 0 0 1
+if output="$(run_theme_helper theme-recovery-write-fail recover-system-theme-runtime 2>&1)"; then
+  echo "failed theme restoration was accepted" >&2; exit 1
+fi
+[[ "$output" == *"restoration command failed"* ]]
+[[ "$(cat "$STATE")" == *"theme_snapshot=1"* ]]
+set_state 1 1 1 0 0 0 0 0 1
 if output="$(run_helper theme-recovery recover-system-theme-runtime 2>&1)"; then
   echo "marker token enabled theme recovery" >&2; exit 1
 fi
@@ -208,4 +230,4 @@ expect_failure reused-pid recover-marker-runtime "recorded PID still exists"
 [[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0 theme_snapshot=0" ]]
 set_state 1 1 1 1 1
 expect_failure proc-fail stop "UNKNOWN"
-echo "NullGate device harness scenarios passed, including locked test-client installation and six final-review regressions"
+echo "NullGate device harness scenarios passed, including locked installs, recovery preservation and review regressions"

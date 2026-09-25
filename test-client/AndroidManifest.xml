@@ -2,6 +2,7 @@
     package="org.nullprotocol.nullgate.testclient"
     android:versionCode="1"
     android:versionName="0.1">
+    <uses-permission android:name="android.permission.HIDE_OVERLAY_WINDOWS" />
     <queries>
         <package android:name="org.nullprotocol.nullgate" />
     </queries>

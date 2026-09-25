@@ -184,7 +184,9 @@ public final class MainActivity extends Activity {
                 }
                 throw new SecurityException("receipt persistence failed");
             }
-            if (!"GRANTED".equals(decision) && store().edit().clear().commit()) {
+            if (TestClientResponsePolicy.isConfirmedCleanDenial(
+                    resultCode == RESULT_CANCELED, data.getExtras().keySet(), decision)
+                    && store().edit().clear().commit()) {
                 status.setText("Not granted: " + decision);
                 refreshButtons(TestClientStatePolicy.CLEAN);
                 return;
@@ -209,9 +211,11 @@ public final class MainActivity extends Activity {
                     status.setText("Cleanup was confirmed, but local state is uncertain.");
                 }
             } else {
+                store().edit().putString("phase", TestClientStatePolicy.UNKNOWN).commit();
                 status.setText("Revocation not confirmed: " + decision);
             }
         } catch (SecurityException invalid) {
+            store().edit().putString("phase", TestClientStatePolicy.UNKNOWN).commit();
             status.setText("Revocation not confirmed: DENIED_INVALID_RESULT");
         }
         refreshButtons(currentPhase());
@@ -236,8 +240,8 @@ public final class MainActivity extends Activity {
                 }
                 throw new SecurityException("reconciled receipt persistence failed");
             }
-            if ("NOT_FOUND".equals(decision)
-                    || "REVOKED_AFTER_UNCERTAIN_RESULT".equals(decision)) {
+            if (TestClientResponsePolicy.isConfirmedCleanReconciliation(
+                    resultCode == RESULT_CANCELED, data.getExtras().keySet(), decision)) {
                 if (store().edit().clear().commit()) {
                     status.setText("Reconciled clean: no active external lease remains.");
                     refreshButtons(TestClientStatePolicy.CLEAN);

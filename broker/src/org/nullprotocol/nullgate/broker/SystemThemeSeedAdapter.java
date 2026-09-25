@@ -20,6 +20,7 @@ public final class SystemThemeSeedAdapter implements CapabilityAdapter {
     private String prior;
     private boolean baselineCaptured;
     private boolean snapshotWriteAttempted;
+    private boolean snapshotRecordOwned;
     private boolean mutationMayHaveOccurred;
 
     public SystemThemeSeedAdapter(Backend backend) { this.backend = backend; }
@@ -39,6 +40,7 @@ public final class SystemThemeSeedAdapter implements CapabilityAdapter {
             baselineCaptured = true;
             snapshotWriteAttempted = true;
             backend.recordSnapshot(prior);
+            snapshotRecordOwned = true;
             mutationMayHaveOccurred = true;
             backend.apply(lease.payload.seedArgb, lease.payload.themeStyle);
             if (!backend.matches(lease.payload.seedArgb, lease.payload.themeStyle))
@@ -65,12 +67,14 @@ public final class SystemThemeSeedAdapter implements CapabilityAdapter {
     private void cleanupOwnedState() throws Exception {
         if (!baselineCaptured)
             throw new IllegalStateException("theme baseline was never captured");
+        if (snapshotWriteAttempted && !snapshotRecordOwned)
+            throw new SecurityException("theme snapshot receipt ownership is unconfirmed");
         if (mutationMayHaveOccurred) {
             backend.restore(prior);
             if (!backend.matchesSnapshot(prior))
                 throw new SecurityException("system theme restoration could not be verified");
         }
-        if (snapshotWriteAttempted) backend.clearSnapshotRecord();
+        if (snapshotRecordOwned) backend.clearSnapshotRecord();
         resetOwnership();
     }
 
@@ -79,6 +83,7 @@ public final class SystemThemeSeedAdapter implements CapabilityAdapter {
         prior = null;
         baselineCaptured = false;
         snapshotWriteAttempted = false;
+        snapshotRecordOwned = false;
         mutationMayHaveOccurred = false;
     }
 

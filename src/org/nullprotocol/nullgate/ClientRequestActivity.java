@@ -28,6 +28,7 @@ public final class ClientRequestActivity extends Activity {
             java.util.concurrent.Executors.newSingleThreadExecutor();
     private final BrokerClient broker = new BrokerClient();
     private ExternalClientPolicy.ApprovedThemeRequest approved;
+    private long approvalGeneration = -1L;
     private TextView status;
     private Button approveButton;
     private Button denyButton;
@@ -48,6 +49,11 @@ public final class ClientRequestActivity extends Activity {
                 return;
             }
             approved = validateCallerAndPayload(getIntent());
+            approvalGeneration = reserveApprovalGeneration();
+            if (approvalGeneration < 0) {
+                finishDenied("DENIED_RECOVERY_RECORD_FAILED");
+                return;
+            }
             setContentView(buildConfirmation());
             recoverExistingOrAwaitApproval();
         } catch (Exception denied) {
@@ -117,11 +123,7 @@ public final class ClientRequestActivity extends Activity {
                 caller.uid, caller.packageName, caller.versionCode,
                 caller.owners, caller.digests, soleSignerDigest(getPackageName()));
         String requestedId = extras.getString(ClientRequestContract.EXTRA_LEASE_ID);
-        synchronized (STATE_LOCK) {
-            SharedPreferences prefs = store();
-            if (!recordOwnedBy(prefs, requestedId, caller.packageName, caller.uid))
-                throw new SecurityException("revoke does not own the recorded lease");
-        }
+        reserveCleanup(requestedId, caller.packageName, caller.uid, "REVOKING");
         TRANSPORT.execute(() -> {
             try {
                 String decision = broker.revoke(requestedId).code;
@@ -155,7 +157,7 @@ public final class ClientRequestActivity extends Activity {
                 extras.getInt(ClientRequestContract.EXTRA_PROTOCOL_VERSION, -1), true,
                 caller.uid, caller.packageName, caller.versionCode,
                 caller.owners, caller.digests, soleSignerDigest(getPackageName()));
-        OwnedRecord record = ownedRecord(caller.packageName, caller.uid);
+        OwnedRecord record = reserveReconciliation(caller.packageName, caller.uid);
         if (record == null) {
             finishDenied("NOT_FOUND");
             return;
@@ -227,27 +229,9 @@ public final class ClientRequestActivity extends Activity {
             record = new OwnedRecord(prefs.getString("lease_id", null),
                     prefs.getString("phase", "UNKNOWN"), prefs.getLong("expires", 0L));
         }
-        if ("ACTIVE".equals(record.phase)) {
-            if (SystemClock.elapsedRealtime() >= record.expires) {
-                approveButton.setEnabled(false);
-                status.setText("Prior lease expired; verifying cleanup before another request…");
-                reconcileUnknown(record.leaseId);
-                return;
-            }
-            finishGranted(record.leaseId, record.expires);
-            return;
-        }
         approveButton.setEnabled(false);
-        status.setText("Recovering the in-flight NullGate decision…");
-        status.postDelayed(() -> {
-            if (isFinishing() || isDestroyed()) return;
-            OwnedRecord settled = ownedRecord(approved.clientPackage, approved.clientUid);
-            if (settled != null && ExternalLeaseStatePolicy.canReturnDelayedGrant(
-                    record.leaseId, settled.leaseId, settled.phase, settled.expires,
-                    SystemClock.elapsedRealtime()))
-                finishGranted(settled.leaseId, settled.expires);
-            else reconcileUnknown(record.leaseId);
-        }, 2500L);
+        status.setText("Existing state requires fail-closed reconciliation…");
+        reconcileUnknown(record.leaseId);
     }
 
     private void approve() {
@@ -265,7 +249,7 @@ public final class ClientRequestActivity extends Activity {
         long now = SystemClock.elapsedRealtime();
         LeaseRequest lease = LeaseRequest.forSystemTheme(
                 approved.seedArgb, approved.style.name(), now, approved.durationMillis);
-        if (!saveSubmitting(lease)) {
+        if (!saveSubmitting(lease, approvalGeneration)) {
             finishDenied("DENIED_RECOVERY_RECORD_FAILED");
             return;
         }
@@ -273,15 +257,21 @@ public final class ClientRequestActivity extends Activity {
             try {
                 String decision = broker.issue(lease).code;
                 boolean settled = persistDecision(lease.id, approved.clientPackage,
-                        approved.clientUid, decision);
+                        approved.clientUid, approvalGeneration, decision);
                 runOnUiThread(() -> {
                     if (isFinishing() || isDestroyed()) return;
                     if (!settled) {
-                        finishDenied("DENIED_STALE_CONTROLLER_RESULT");
+                        reconcileUnknown(lease.id, approved.clientPackage, approved.clientUid);
                         return;
                     }
-                    if ("GRANTED".equals(decision))
-                        finishGranted(lease.id, lease.expiresAtElapsedMillis);
+                    if ("GRANTED".equals(decision)) {
+                        if (canDeliverGrant(lease.id, approved.clientPackage,
+                                approved.clientUid, approvalGeneration,
+                                lease.expiresAtElapsedMillis))
+                            finishGranted(lease.id, lease.expiresAtElapsedMillis);
+                        else reconcileUnknown(lease.id, approved.clientPackage,
+                                approved.clientUid);
+                    }
                     else if ("CLEANUP_FAILED".equals(decision))
                         showHostRecoveryRequired();
                     else if (clearRecordIfOwned(lease.id, approved.clientPackage,
@@ -304,6 +294,10 @@ public final class ClientRequestActivity extends Activity {
         if (approveButton != null) approveButton.setEnabled(false);
         if (denyButton != null) denyButton.setEnabled(false);
         status.setText("Outcome uncertain; requesting fail-closed revocation…");
+        if (!invalidateAndMarkReconciliation(leaseId, clientPackage, clientUid)) {
+            showHostRecoveryRequired();
+            return;
+        }
         TRANSPORT.execute(() -> {
             try {
                 String decision = broker.revoke(leaseId).code;
@@ -323,10 +317,12 @@ public final class ClientRequestActivity extends Activity {
         });
     }
 
-    private boolean saveSubmitting(LeaseRequest lease) {
+    private boolean saveSubmitting(LeaseRequest lease, long generation) {
         synchronized (STATE_LOCK) {
-            if (store().getString("lease_id", null) != null) return false;
-            return store().edit().putString("lease_id", lease.id)
+            SharedPreferences prefs = store();
+            if (prefs.getString("lease_id", null) != null
+                    || prefs.getLong("approval_generation", 0L) != generation) return false;
+            return prefs.edit().putString("lease_id", lease.id)
                     .putString("lease_nonce", lease.nonce)
                     .putString("client_package", approved.clientPackage)
                     .putInt("client_uid", approved.clientUid)
@@ -347,12 +343,15 @@ public final class ClientRequestActivity extends Activity {
     }
 
     private boolean persistDecision(String leaseId, String clientPackage, int clientUid,
-            String decision) {
+            long generation, String decision) {
         String phase = "GRANTED".equals(decision) ? "ACTIVE"
                 : "CLEANUP_FAILED".equals(decision) ? "CLEANUP_FAILED" : "FINISHED";
         synchronized (STATE_LOCK) {
             SharedPreferences prefs = store();
             return recordOwnedBy(prefs, leaseId, clientPackage, clientUid)
+                    && ExternalLeaseStatePolicy.canSettle(leaseId,
+                        prefs.getString("lease_id", null), prefs.getString("phase", ""),
+                        generation, prefs.getLong("approval_generation", -1L))
                     && prefs.edit().putString("phase", phase)
                         .putString("decision", decision).commit();
         }
@@ -387,9 +386,79 @@ public final class ClientRequestActivity extends Activity {
     private boolean clearRecordIfOwned(String leaseId, String clientPackage, int clientUid) {
         synchronized (STATE_LOCK) {
             SharedPreferences prefs = store();
-            return recordOwnedBy(prefs, leaseId, clientPackage, clientUid)
-                    && prefs.edit().clear().commit();
+            if (!recordOwnedBy(prefs, leaseId, clientPackage, clientUid)) return false;
+            long generation = prefs.getLong("approval_generation", 0L);
+            return prefs.edit().clear().putLong("approval_generation", generation).commit();
         }
+    }
+
+    private long reserveApprovalGeneration() {
+        synchronized (STATE_LOCK) {
+            SharedPreferences prefs = store();
+            long next = nextGeneration(prefs.getLong("approval_generation", 0L));
+            return prefs.edit().putLong("approval_generation", next).commit() ? next : -1L;
+        }
+    }
+
+    private void reserveCleanup(String leaseId, String clientPackage, int clientUid,
+            String phase) {
+        synchronized (STATE_LOCK) {
+            SharedPreferences prefs = store();
+            if (!recordOwnedBy(prefs, leaseId, clientPackage, clientUid))
+                throw new SecurityException("cleanup does not own the recorded lease");
+            long next = nextGeneration(prefs.getLong("approval_generation", 0L));
+            if (!prefs.edit().putLong("approval_generation", next)
+                    .putString("phase", phase).commit())
+                throw new SecurityException("cleanup reservation could not be persisted");
+        }
+    }
+
+    private OwnedRecord reserveReconciliation(String clientPackage, int clientUid) {
+        synchronized (STATE_LOCK) {
+            SharedPreferences prefs = store();
+            String leaseId = prefs.getString("lease_id", null);
+            long next = nextGeneration(prefs.getLong("approval_generation", 0L));
+            SharedPreferences.Editor edit = prefs.edit().putLong("approval_generation", next);
+            if (leaseId == null) {
+                if (!edit.commit())
+                    throw new SecurityException("reconciliation invalidation failed");
+                return null;
+            }
+            if (!recordOwnedBy(prefs, leaseId, clientPackage, clientUid))
+                throw new SecurityException("reconciliation does not own the recorded lease");
+            if (!edit.putString("phase", "RECONCILING").commit())
+                throw new SecurityException("reconciliation reservation failed");
+            return new OwnedRecord(leaseId, "RECONCILING", prefs.getLong("expires", 0L));
+        }
+    }
+
+    private boolean invalidateAndMarkReconciliation(String leaseId, String clientPackage,
+            int clientUid) {
+        synchronized (STATE_LOCK) {
+            SharedPreferences prefs = store();
+            long next = nextGeneration(prefs.getLong("approval_generation", 0L));
+            SharedPreferences.Editor edit = prefs.edit().putLong("approval_generation", next);
+            if (recordOwnedBy(prefs, leaseId, clientPackage, clientUid))
+                edit.putString("phase", "RECONCILING");
+            return edit.commit();
+        }
+    }
+
+    private boolean canDeliverGrant(String leaseId, String clientPackage, int clientUid,
+            long generation, long expires) {
+        synchronized (STATE_LOCK) {
+            SharedPreferences prefs = store();
+            return recordOwnedBy(prefs, leaseId, clientPackage, clientUid)
+                    && ExternalLeaseStatePolicy.canDeliverGrant(leaseId,
+                        prefs.getString("lease_id", null), prefs.getString("phase", ""),
+                        generation, prefs.getLong("approval_generation", -1L),
+                        expires, prefs.getLong("expires", -1L),
+                        SystemClock.elapsedRealtime());
+        }
+    }
+
+    private static long nextGeneration(long current) {
+        return current == Long.MAX_VALUE ? 1L : current + 1L;
     }
 
     private OwnedRecord ownedRecord(String clientPackage, int clientUid) {

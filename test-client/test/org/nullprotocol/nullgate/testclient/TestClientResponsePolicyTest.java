@@ -20,6 +20,16 @@ public final class TestClientResponsePolicyTest {
         check(LEASE.equals(accepted.leaseId) && accepted.expiresElapsed == 70_000L);
         check(TestClientResponsePolicy.isConfirmedRevoke(
                 true, decision, "REVOKED"));
+        check(TestClientResponsePolicy.isConfirmedCleanDenial(
+                true, decision, "DENIED_BY_USER"));
+        check(!TestClientResponsePolicy.isConfirmedCleanDenial(
+                true, decision, "CLEANUP_FAILED"));
+        check(!TestClientResponsePolicy.isConfirmedCleanDenial(
+                true, decision, "DENIED_STALE_CONTROLLER_RESULT"));
+        check(TestClientResponsePolicy.isConfirmedCleanReconciliation(
+                true, decision, "REVOKED_AFTER_UNCERTAIN_RESULT"));
+        check(!TestClientResponsePolicy.isConfirmedCleanReconciliation(
+                true, decision, "CLEANUP_FAILED"));
         denies(() -> TestClientResponsePolicy.validateDecision(
                 keys(TestClientResponsePolicy.EXTRA_DECISION, "command"), "GRANTED", true));
         denies(() -> TestClientResponsePolicy.validateDecision(decision, "", true));
@@ -31,7 +41,7 @@ public final class TestClientResponsePolicyTest {
                 true, receipt, "GRANTED", LEASE, 10_000L, 10_000L));
         denies(() -> TestClientResponsePolicy.requireFreshGrant(
                 true, receipt, "GRANTED", LEASE, 70_001L, 10_000L));
-        System.out.println("NullGate test-client response checks: 9 passed");
+        System.out.println("NullGate test-client response checks: 15 passed");
     }
 
     private static Set<String> keys(String... values) {

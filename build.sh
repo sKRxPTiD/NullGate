@@ -86,6 +86,15 @@ javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/test-client-classes" \
   --out "$DIST_DIR/NullGate-test-client-debug.apk" "$OUT_DIR/test-client-aligned.apk"
 "$BUILD_TOOLS/apksigner" verify --verbose "$DIST_DIR/NullGate-test-client-debug.apk"
 
+verify_manifest_identity() {
+  local apk="$1" expected_package="$2" expected_version="$3" badging
+  badging="$("$BUILD_TOOLS/aapt2" dump badging "$apk" | sed -n '1p')"
+  [[ "$badging" == *"name='$expected_package'"* && "$badging" == *"versionCode='$expected_version'"* ]] || { echo "Unexpected packaged identity: $apk" >&2; exit 1; }
+  "$BUILD_TOOLS/aapt2" dump permissions "$apk" | grep -Fqx "uses-permission: name='android.permission.HIDE_OVERLAY_WINDOWS'" || { echo "Overlay protection permission missing: $apk" >&2; exit 1; }
+}
+verify_manifest_identity "$DIST_DIR/NullGate-prototype-debug.apk" org.nullprotocol.nullgate 1
+verify_manifest_identity "$DIST_DIR/NullGate-test-client-debug.apk" org.nullprotocol.nullgate.testclient 1
+
 javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/broker-classes" \
   $(find "$BASE_DIR/common/src" "$BASE_DIR/broker/src" "$BASE_DIR/broker/android" -name '*.java' -print)
 "$BUILD_TOOLS/d8" --min-api 26 --lib "$ANDROID_JAR" --output "$OUT_DIR/broker-dex" \
