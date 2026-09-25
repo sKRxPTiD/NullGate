@@ -26,6 +26,8 @@ https://github.com/sKRxPTiD/NullGate.
   fixed 60-second duration through an explicit result-bound Activity request.
 - Save the returned lease receipt, revoke an active lease before replacing it,
   and request immediate revocation when fabricated colors are removed.
+- Validate exact result schemas and retain an uncertain state after malformed,
+  lost, or unconfirmed results until NullGate confirms reconciliation.
 - Fail closed for boot, Tasker, and other background-triggered changes because
   NullGate requires visible user approval.
 
@@ -49,6 +51,8 @@ previous theme state.
 
 - `:app:compileDebugKotlin` passes.
 - `:app:assembleDebug` passes.
+- `:app:testDebugUnitTest` passes, including exact grant, denial, revoke, and
+  reconciliation-result policy checks.
 - The exported patch applies cleanly to upstream commit
   `5b078e92abfa482674d82a23ce2a302d17cee756`.
 - The integration introduces no new lint errors. The current upstream tree

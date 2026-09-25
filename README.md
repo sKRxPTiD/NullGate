@@ -133,9 +133,12 @@ UID, is signed with the controller's local development identity, and receives
 only a lease receipt. A signer-pinning reference client compiles with every
 build. A direct ADB-shell spoof attempt on PiXi was denied with no broker
 runtime and ADB remaining non-root. The matching ColorBlendr client patch now
-builds off-device and is exported under `integrations/patches/`; PiXi's official
-ColorBlendr remains untouched. Live ColorBlendr integration awaits upstream
-adoption under the official signer and a new NullGate version-policy review.
+builds off-device, rejects malformed or ambiguous Activity results, and
+reconciles interrupted grant/revoke operations instead of treating them as
+clean. Its policy unit tests pass and the current patch series is exported under
+`integrations/patches/`; PiXi's official ColorBlendr remains untouched. Live
+ColorBlendr integration awaits upstream adoption under the official signer and
+a new NullGate version-policy review.
 See `CLIENT_INTEGRATION.md` and `TEST_CLIENT.md`.
 
 Protocol v2 and the first native adapter are now implemented off-device. The

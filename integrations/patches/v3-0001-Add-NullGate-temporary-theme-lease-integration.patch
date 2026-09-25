@@ -1,7 +1,7 @@
 From 142aaa14d528000f7484609d03698297227dfea5 Mon Sep 17 00:00:00 2001
 From: Wolf <wolf@nullprotocol.local>
 Date: Thu, 24 Sep 2026 13:09:17 -0500
-Subject: [PATCH v2] Add NullGate temporary theme lease integration
+Subject: [PATCH v3 1/2] Add NullGate temporary theme lease integration
 
 ---
  NULLGATE_INTEGRATION.md                       |  46 +++++

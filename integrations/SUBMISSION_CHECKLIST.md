@@ -4,6 +4,9 @@
 - [x] Patch applies cleanly to a fresh checkout.
 - [x] Kotlin compilation passes.
 - [x] Debug APK assembly passes.
+- [x] Result-policy unit tests pass.
+- [x] Lost, malformed, or unconfirmed results remain uncertain until the
+      controller confirms reconciliation.
 - [x] NullGate-specific lint errors resolved.
 - [x] Existing ColorBlendr modes remain unchanged.
 - [x] No general shell or arbitrary command interface added.
