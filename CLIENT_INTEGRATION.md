@@ -81,3 +81,7 @@ reviewed 3.0.1 source. It has not been installed over ColorBlendr: a locally
 signed APK cannot replace or impersonate the official package. Android
 instrumentation and process-death testing require an officially signed upstream
 release, followed by review and admission of that release version in NullGate.
+
+For a new app or capability, start with `ADAPTER_AUTHORING_GUIDE.md` and record
+the evidence in `UNIVERSAL_TEST_MATRIX.md`. ColorBlendr remains the first test
+client, not a special privilege path.

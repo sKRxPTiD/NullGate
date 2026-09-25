@@ -180,6 +180,8 @@ official package is present.
 - `NATIVE_CAPABILITY_CONTRACT.md` defines the first typed native capability.
 - `THREAT_MODEL.md` and `SECURITY_AUDIT.md` record the current security boundary.
 - `integrations/patches/` contains the reviewed ColorBlendr integration patch.
+- `ADAPTER_AUTHORING_GUIDE.md` and `UNIVERSAL_TEST_MATRIX.md` guide future
+  clients and capabilities.
 
 The upstream ColorBlendr proposal is tracked in
 [Mahmud0808/ColorBlendr#314](https://github.com/Mahmud0808/ColorBlendr/pull/314).
