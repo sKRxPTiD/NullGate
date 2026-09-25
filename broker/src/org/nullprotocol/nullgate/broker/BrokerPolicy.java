@@ -11,6 +11,7 @@ public final class BrokerPolicy {
     public final String controllerPackage;
     public final String controllerCertificateSha256;
     public final long maximumLeaseMillis;
+    public final int maximumActiveLeases;
     private final Map<String, Set<Capability>> allowed;
 
     public BrokerPolicy(
@@ -18,10 +19,22 @@ public final class BrokerPolicy {
             String controllerCertificateSha256,
             long maximumLeaseMillis,
             Map<String, Set<Capability>> allowed) {
+        this(controllerPackage, controllerCertificateSha256, maximumLeaseMillis, 1, allowed);
+    }
+
+    public BrokerPolicy(
+            String controllerPackage,
+            String controllerCertificateSha256,
+            long maximumLeaseMillis,
+            int maximumActiveLeases,
+            Map<String, Set<Capability>> allowed) {
         if (maximumLeaseMillis <= 0) throw new IllegalArgumentException("maximumLeaseMillis must be positive");
+        if (maximumActiveLeases <= 0)
+            throw new IllegalArgumentException("maximumActiveLeases must be positive");
         this.controllerPackage = controllerPackage;
         this.controllerCertificateSha256 = CallerIdentity.normalizeDigest(controllerCertificateSha256);
         this.maximumLeaseMillis = maximumLeaseMillis;
+        this.maximumActiveLeases = maximumActiveLeases;
         Map<String, Set<Capability>> copy = new HashMap<>();
         for (Map.Entry<String, Set<Capability>> entry : allowed.entrySet()) {
             copy.put(entry.getKey(), Collections.unmodifiableSet(EnumSet.copyOf(entry.getValue())));

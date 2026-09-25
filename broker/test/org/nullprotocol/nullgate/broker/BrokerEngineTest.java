@@ -26,8 +26,10 @@ public final class BrokerEngineTest {
         expiresWithoutPersistence();
         rejectsReplayAndReuse();
         rejectsExcessDuration();
+        limitsConcurrentActiveLeases();
+        rejectsInvalidActiveLeaseLimit();
         boundsLifetimeHistory();
-        System.out.println("NullGate broker tests: 7 passed");
+        System.out.println("NullGate broker tests: 9 passed");
     }
 
     private static BrokerPolicy policy() {
@@ -88,6 +90,27 @@ public final class BrokerEngineTest {
         FakeClock clock = new FakeClock(); BrokerEngine engine = new BrokerEngine(policy(), clock);
         check(engine.request(TestAdapters.READY, caller(), lease(LEASE_1, NONCE_1, Capability.COLORBLENDR_OVERLAY_APPLY, 700_001)).code
                 == Decision.Code.DURATION_EXCEEDS_POLICY);
+    }
+
+    private static void limitsConcurrentActiveLeases() {
+        FakeClock clock = new FakeClock(); BrokerEngine engine = new BrokerEngine(policy(), clock);
+        check(engine.request(TestAdapters.READY, caller(), lease(LEASE_1, NONCE_1,
+                Capability.COLORBLENDR_OVERLAY_APPLY, 20_000)).granted());
+        check(engine.request(TestAdapters.READY, caller(), lease(LEASE_2, NONCE_2,
+                Capability.COLORBLENDR_OVERLAY_APPLY, 20_000)).code
+                == Decision.Code.CAPACITY_EXHAUSTED);
+        check(engine.revoke(caller(), LEASE_1).code == Decision.Code.REVOKED);
+        check(engine.request(TestAdapters.READY, caller(), lease(LEASE_2, NONCE_2,
+                Capability.COLORBLENDR_OVERLAY_APPLY, 20_000)).granted());
+    }
+
+    private static void rejectsInvalidActiveLeaseLimit() {
+        Map<String, Set<Capability>> allow = new HashMap<>();
+        allow.put(COLORBLENDR, EnumSet.of(Capability.COLORBLENDR_OVERLAY_APPLY));
+        try {
+            new BrokerPolicy(CONTROLLER, CERT, 600_000, 0, allow);
+            throw new AssertionError("zero active-lease limit accepted");
+        } catch (IllegalArgumentException expected) { }
     }
 
     private static void boundsLifetimeHistory() {

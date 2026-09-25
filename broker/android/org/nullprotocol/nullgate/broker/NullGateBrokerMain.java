@@ -23,6 +23,7 @@ public final class NullGateBrokerMain {
             "4af4ffa12ce90815a1775c4604ea16c19f5bed2a6e09ae7c3c92815982af052e";
     private static final String SOCKET = "nullgate-broker-v1";
     private static final long MAX_LEASE_MILLIS = 10 * 60 * 1000L;
+    private static final int MAX_ACTIVE_LEASES = 1;
     private static final long MAX_BROKER_LIFETIME_MILLIS = 15 * 60 * 1000L;
     private static final File PID_FILE = new File("/data/local/tmp/nullgate/broker.pid");
 
@@ -66,7 +67,8 @@ public final class NullGateBrokerMain {
                                     OFFICIAL_SHIZUKU_SIGNER, COLORBLENDR,
                                     COLORBLENDR_SIGNER)));
         }
-        BrokerPolicy policy = new BrokerPolicy(CONTROLLER, pinnedCert, MAX_LEASE_MILLIS, allow);
+        BrokerPolicy policy = new BrokerPolicy(
+                CONTROLLER, pinnedCert, MAX_LEASE_MILLIS, MAX_ACTIVE_LEASES, allow);
         BrokerEngine engine = new BrokerEngine(policy, SystemClock::elapsedRealtime, (lease, reason) -> {
             System.out.println("audit lease=" + lease.leaseId + " cleanup=" + reason);
         });

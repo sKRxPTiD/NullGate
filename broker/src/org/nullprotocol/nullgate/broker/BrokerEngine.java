@@ -56,6 +56,8 @@ public final class BrokerEngine {
         if (seenLeaseIds.contains(lease.leaseId)) return result(Decision.Code.LEASE_ID_REUSE, lease.leaseId);
         if (seenLeaseIds.size() >= MAX_LEASES_PER_BROKER_LIFETIME)
             return result(Decision.Code.CAPACITY_EXHAUSTED, lease.leaseId);
+        if (active.size() >= policy.maximumActiveLeases)
+            return result(Decision.Code.CAPACITY_EXHAUSTED, lease.leaseId);
         if (adapter == null) return result(Decision.Code.ADAPTER_UNAVAILABLE, lease.leaseId);
         try {
             if (!adapter.isReady(lease.targetPackage))

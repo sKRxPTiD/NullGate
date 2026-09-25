@@ -34,6 +34,7 @@ confirmed.
 - [ ] Target package and signer policy are separate from adapter logic.
 - [ ] The package-capability adapter registration is unique and cannot be shadowed.
 - [ ] Lease duration has a hard upper bound.
+- [ ] Concurrent active leases stay within the explicit broker policy ceiling.
 - [ ] Activation is verified after the write.
 - [ ] The exact prior state is recorded before mutation.
 - [ ] Expiry and revoke restore the recorded state.

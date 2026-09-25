@@ -21,7 +21,9 @@ response codes. Root processes remain trusted.
 ISSUE fields: random lease ID and nonce, exact target package, named capability,
 issued and expiry elapsedRealtime timestamps. Times must be nonnegative, live
 and within the ten-minute maximum. Nonces/IDs cannot be reused. Capacity is
-256 IDs per process, including revoke-before-issue tombstones.
+256 IDs per process, including revoke-before-issue tombstones. The production
+policy currently permits exactly one active lease; the ceiling is explicit and
+must be reviewed before any future increase.
 
 Target installation and a registered ready capability adapter are required.
 There are no production convenience constructors that supply a no-op adapter.
