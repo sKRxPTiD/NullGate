@@ -52,6 +52,11 @@ These do not execute Android socket, SELinux, Activity lifecycle, app_process,
 filesystem or shutdown behavior. No Android emulator/instrumentation test has
 been run for this audit.
 
+The subsequent deployment review exercised real non-root Android approval,
+denial, process restart, reconciliation and broker-absent behavior on PiXi.
+See `DEPLOYMENT_VERDICT_2026-09-25.md` for the evidence, remaining limits, and
+conditional approval of the supervised first-party external-client theme test.
+
 Outputs:
 - `dist/NullGate-prototype-debug.apk`
 - `dist/NullGate-test-client-debug.apk`
