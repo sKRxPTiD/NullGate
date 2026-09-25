@@ -8,7 +8,9 @@ exact restoration. A separate ColorBlendr compatibility mode is built and
 host-tested for the pinned official Shizuku release, but it has not passed its
 PiXi deployment gate and must not be treated as operational yet.
 
-The separate NullGate Test Client is also built but not installed. Its guarded
+The separate NullGate Test Client is installed on PiXi, but its external-client
+success path is blocked by the lifecycle failure in `DEVICE_TEST_2026-09-25.md`.
+Its guarded
 installer uses the dedicated `NULLGATE_TEST_CLIENT_V1` acknowledgement and
 refuses installation while a broker runtime exists. The ordinary marker-test
 token cannot install it. See `DEPLOYMENT_GATE.md` before any device use.

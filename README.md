@@ -56,6 +56,9 @@ The subsequent deployment review exercised real non-root Android approval,
 denial, process restart, reconciliation and broker-absent behavior on PiXi.
 See `DEPLOYMENT_VERDICT_2026-09-25.md` for the evidence, remaining limits, and
 conditional approval of the supervised first-party external-client theme test.
+That test subsequently stopped safely on theme-triggered Activity recreation:
+the grant was revoked and exact restoration verified. External-client success
+remains blocked pending the lifecycle repair in `DEVICE_TEST_2026-09-25.md`.
 
 Outputs:
 - `dist/NullGate-prototype-debug.apk`
