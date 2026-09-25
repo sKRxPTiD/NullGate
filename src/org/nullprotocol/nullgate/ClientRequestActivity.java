@@ -29,9 +29,16 @@ public final class ClientRequestActivity extends Activity {
     private final BrokerClient broker = new BrokerClient();
     private ExternalClientPolicy.ApprovedThemeRequest approved;
     private long approvalGeneration = -1L;
+    private ExternalActivityOperation operation;
+    private String operationClientPackage;
+    private int operationClientUid = -1;
     private TextView status;
     private Button approveButton;
     private Button denyButton;
+    private final ExternalActivityOperation.Listener operationListener = () ->
+            runOnUiThread(() -> {
+                if (!isFinishing() && !isDestroyed()) handleOperationEvent();
+            });
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -39,27 +46,89 @@ public final class ClientRequestActivity extends Activity {
         if (android.os.Build.VERSION.SDK_INT >= 31) getWindow().setHideOverlayWindows(true);
         try {
             if (ClientRequestContract.ACTION_REVOKE.equals(getIntent().getAction())) {
+                CallerEvidence caller = authorizeClientAction(getIntent(), false);
+                operationClientPackage = caller.packageName;
+                operationClientUid = caller.uid;
+                String leaseId = getIntent().getStringExtra(ClientRequestContract.EXTRA_LEASE_ID);
+                String fingerprint = fingerprint("REVOKE", caller, leaseId);
                 setContentView(buildProgress("Verifying and revoking the client-owned lease…"));
-                handleRevoke(getIntent());
+                if (!restoreRetained(ExternalActivityOperation.Kind.REVOKE, fingerprint)) {
+                    reserveCleanup(leaseId, caller.packageName, caller.uid, "REVOKING");
+                    operation = new ExternalActivityOperation(
+                            ExternalActivityOperation.Kind.REVOKE, fingerprint, -1L);
+                    operation.begin();
+                    attachOperation();
+                    startRevoke(leaseId, caller.packageName, caller.uid);
+                }
                 return;
             }
             if (ClientRequestContract.ACTION_RECONCILE.equals(getIntent().getAction())) {
+                CallerEvidence caller = authorizeClientAction(getIntent(), true);
+                operationClientPackage = caller.packageName;
+                operationClientUid = caller.uid;
+                String fingerprint = fingerprint("RECONCILE", caller, "");
                 setContentView(buildProgress("Reconciling the client-owned lease…"));
-                handleReconcile(getIntent());
+                if (!restoreRetained(ExternalActivityOperation.Kind.RECONCILE, fingerprint)) {
+                    operation = new ExternalActivityOperation(
+                            ExternalActivityOperation.Kind.RECONCILE, fingerprint, -1L);
+                    operation.begin();
+                    attachOperation();
+                    OwnedRecord record = reserveReconciliation(caller.packageName, caller.uid);
+                    if (record == null) finishDenied("NOT_FOUND");
+                    else startReconciliation(record.leaseId, caller.packageName,
+                            caller.uid, true);
+                }
                 return;
             }
             approved = validateCallerAndPayload(getIntent());
-            approvalGeneration = reserveApprovalGeneration();
-            if (approvalGeneration < 0) {
-                finishDenied("DENIED_RECOVERY_RECORD_FAILED");
-                return;
-            }
+            operationClientPackage = approved.clientPackage;
+            operationClientUid = approved.clientUid;
+            String fingerprint = fingerprint(approved);
             setContentView(buildConfirmation());
-            recoverExistingOrAwaitApproval();
+            if (!restoreRetained(ExternalActivityOperation.Kind.REQUEST, fingerprint)) {
+                approvalGeneration = reserveApprovalGeneration();
+                if (approvalGeneration < 0) {
+                    finishDenied("DENIED_RECOVERY_RECORD_FAILED");
+                    return;
+                }
+                operation = new ExternalActivityOperation(
+                        ExternalActivityOperation.Kind.REQUEST, fingerprint,
+                        approvalGeneration);
+                attachOperation();
+                recoverExistingOrAwaitApproval();
+            } else {
+                approvalGeneration = operation.approvalGeneration;
+                if (operation.isStarted()) {
+                    approveButton.setEnabled(false);
+                    denyButton.setEnabled(false);
+                    status.setText("Completing the approved request…");
+                }
+            }
         } catch (Exception denied) {
             finishDenied("DENIED_INVALID_CLIENT_REQUEST");
         }
     }
+
+    @Override public Object onRetainNonConfigurationInstance() { return operation; }
+
+    @Override protected void onDestroy() {
+        if (operation != null) operation.detach(operationListener);
+        super.onDestroy();
+    }
+
+    private boolean restoreRetained(ExternalActivityOperation.Kind kind,
+            String fingerprint) {
+        Object retained = getLastNonConfigurationInstance();
+        if (!(retained instanceof ExternalActivityOperation)) return false;
+        ExternalActivityOperation candidate = (ExternalActivityOperation) retained;
+        if (!candidate.matches(kind, fingerprint))
+            throw new SecurityException("retained operation identity changed");
+        operation = candidate;
+        attachOperation();
+        return true;
+    }
+
+    private void attachOperation() { operation.attach(operationListener); }
 
     private static final class CallerEvidence {
         final String packageName; final int uid; final long versionCode;
@@ -113,58 +182,31 @@ public final class ClientRequestActivity extends Activity {
                 extras.getLong(ClientRequestContract.EXTRA_DURATION_MILLIS, -1));
     }
 
-    private void handleRevoke(Intent intent) throws Exception {
+    private CallerEvidence authorizeClientAction(Intent intent, boolean reconcile)
+            throws Exception {
         Bundle extras = intent.getExtras();
-        if (extras == null || !ClientRequestContract.hasExactRevokeKeys(extras.keySet()))
-            throw new SecurityException("revoke payload schema mismatch");
+        boolean exact = reconcile
+                ? extras != null && ClientRequestContract.hasExactReconcileKeys(extras.keySet())
+                : extras != null && ClientRequestContract.hasExactRevokeKeys(extras.keySet());
+        if (!exact) throw new SecurityException("client cleanup payload schema mismatch");
         CallerEvidence caller = callerEvidence();
         ExternalClientPolicy.authorizeClient(
                 extras.getInt(ClientRequestContract.EXTRA_PROTOCOL_VERSION, -1), true,
                 caller.uid, caller.packageName, caller.versionCode,
                 caller.owners, caller.digests, soleSignerDigest(getPackageName()));
-        String requestedId = extras.getString(ClientRequestContract.EXTRA_LEASE_ID);
-        reserveCleanup(requestedId, caller.packageName, caller.uid, "REVOKING");
+        return caller;
+    }
+
+    private void startRevoke(String requestedId, String clientPackage, int clientUid) {
         TRANSPORT.execute(() -> {
             try {
                 String decision = broker.revoke(requestedId).code;
-                runOnUiThread(() -> {
-                    if (isDestroyed()) return;
-                    if ("REVOKED".equals(decision)
-                            && !clearRecordIfOwned(requestedId, caller.packageName, caller.uid)) {
-                        status.setText("Broker cleanup completed, but controller state is unresolved.");
-                        return;
-                    }
-                    Intent result = new Intent().putExtra(
-                            ClientRequestContract.EXTRA_DECISION, decision);
-                    setResult("REVOKED".equals(decision) ? RESULT_OK : RESULT_CANCELED, result);
-                    finish();
-                });
+                operation.publish(ExternalActivityOperation.Event.cleanup(decision, requestedId));
             } catch (java.io.IOException failed) {
-                runOnUiThread(() -> {
-                    if (isDestroyed()) return;
-                    status.setText("Revocation is unconfirmed. Keep PiXi connected and use host recovery.");
-                });
+                operation.publish(ExternalActivityOperation.Event.cleanupTransportFailure(
+                        requestedId));
             }
         });
-    }
-
-    private void handleReconcile(Intent intent) throws Exception {
-        Bundle extras = intent.getExtras();
-        if (extras == null || !ClientRequestContract.hasExactReconcileKeys(extras.keySet()))
-            throw new SecurityException("reconcile payload schema mismatch");
-        CallerEvidence caller = callerEvidence();
-        ExternalClientPolicy.authorizeClient(
-                extras.getInt(ClientRequestContract.EXTRA_PROTOCOL_VERSION, -1), true,
-                caller.uid, caller.packageName, caller.versionCode,
-                caller.owners, caller.digests, soleSignerDigest(getPackageName()));
-        OwnedRecord record = reserveReconciliation(caller.packageName, caller.uid);
-        if (record == null) {
-            finishDenied("NOT_FOUND");
-            return;
-        }
-        // Reconciliation is deliberately fail-closed: never infer a live broker lease
-        // from controller preferences after result loss or process recreation.
-        reconcileUnknown(record.leaseId, caller.packageName, caller.uid);
     }
 
     private View buildConfirmation() {
@@ -235,6 +277,7 @@ public final class ClientRequestActivity extends Activity {
     }
 
     private void approve() {
+        if (operation == null || !operation.begin()) return;
         approveButton.setEnabled(false); denyButton.setEnabled(false);
         status.setText("Submitting the typed request to the temporary broker…");
         try {
@@ -258,30 +301,12 @@ public final class ClientRequestActivity extends Activity {
                 String decision = broker.issue(lease).code;
                 boolean settled = persistDecision(lease.id, approved.clientPackage,
                         approved.clientUid, approvalGeneration, decision);
-                runOnUiThread(() -> {
-                    if (isFinishing() || isDestroyed()) return;
-                    if (!settled) {
-                        reconcileUnknown(lease.id, approved.clientPackage, approved.clientUid);
-                        return;
-                    }
-                    if ("GRANTED".equals(decision)) {
-                        if (canDeliverGrant(lease.id, approved.clientPackage,
-                                approved.clientUid, approvalGeneration,
-                                lease.expiresAtElapsedMillis))
-                            finishGranted(lease.id, lease.expiresAtElapsedMillis);
-                        else reconcileUnknown(lease.id, approved.clientPackage,
-                                approved.clientUid);
-                    }
-                    else if ("CLEANUP_FAILED".equals(decision))
-                        showHostRecoveryRequired();
-                    else if (clearRecordIfOwned(lease.id, approved.clientPackage,
-                            approved.clientUid)) finishDenied(decision);
-                    else showHostRecoveryRequired();
-                });
+                operation.publish(ExternalActivityOperation.Event.issue(decision,
+                        lease.id, lease.expiresAtElapsedMillis, settled));
             } catch (java.io.IOException unknown) {
                 markUnknownIfOwned(lease.id, approved.clientPackage, approved.clientUid);
-                runOnUiThread(() -> { if (!isDestroyed()) reconcileUnknown(
-                        lease.id, approved.clientPackage, approved.clientUid); });
+                operation.publish(ExternalActivityOperation.Event.issueTransportFailure(
+                        lease.id));
             }
         });
     }
@@ -298,23 +323,89 @@ public final class ClientRequestActivity extends Activity {
             showHostRecoveryRequired();
             return;
         }
+        if (operation != null && !operation.isStarted()) operation.begin();
+        startReconciliation(leaseId, clientPackage, clientUid, false);
+    }
+
+    private void startReconciliation(String leaseId, String clientPackage, int clientUid,
+            boolean alreadyReserved) {
+        if (!alreadyReserved && operation == null)
+            throw new IllegalStateException("reconciliation session required");
         TRANSPORT.execute(() -> {
             try {
                 String decision = broker.revoke(leaseId).code;
-                runOnUiThread(() -> {
-                    if (isFinishing() || isDestroyed()) return;
-                    if ("REVOKED".equals(decision) || "NOT_FOUND".equals(decision)) {
-                        OwnedRecord current = ownedRecord(clientPackage, clientUid);
-                        if (current == null || (leaseId.equals(current.leaseId)
-                                && clearRecordIfOwned(leaseId, clientPackage, clientUid)))
-                            finishDenied("REVOKED_AFTER_UNCERTAIN_RESULT");
-                        else showHostRecoveryRequired();
-                    } else showHostRecoveryRequired();
-                });
+                operation.publish(ExternalActivityOperation.Event.cleanup(decision, leaseId));
             } catch (java.io.IOException failed) {
-                runOnUiThread(() -> { if (!isDestroyed()) showHostRecoveryRequired(); });
+                operation.publish(ExternalActivityOperation.Event.cleanupTransportFailure(
+                        leaseId));
             }
         });
+    }
+
+    private void handleOperationEvent() {
+        if (operation == null) return;
+        ExternalActivityOperation.Event event = operation.pendingEvent();
+        if (event == null || !operation.claim(event)) return;
+
+        if (event.kind == ExternalActivityOperation.EventKind.ISSUE_TRANSPORT_FAILURE) {
+            operation.continueWithCleanup(event);
+            reconcileUnknown(event.leaseId, operationClientPackage, operationClientUid);
+            return;
+        }
+
+        if (event.kind == ExternalActivityOperation.EventKind.CLEANUP_TRANSPORT_FAILURE) {
+            showHostRecoveryRequired();
+            return;
+        }
+
+        if (event.kind == ExternalActivityOperation.EventKind.ISSUE_RESULT) {
+            if (!event.settled) {
+                operation.continueWithCleanup(event);
+                reconcileUnknown(event.leaseId, operationClientPackage, operationClientUid);
+                return;
+            }
+            if ("GRANTED".equals(event.decision)) {
+                if (canDeliverGrant(event.leaseId, operationClientPackage,
+                        operationClientUid, operation.approvalGeneration,
+                        event.expiresElapsed))
+                    finishGranted(event.leaseId, event.expiresElapsed);
+                else {
+                    operation.continueWithCleanup(event);
+                    reconcileUnknown(event.leaseId, operationClientPackage,
+                            operationClientUid);
+                }
+            } else if ("CLEANUP_FAILED".equals(event.decision)) {
+                showHostRecoveryRequired();
+            } else if (clearRecordIfOwned(event.leaseId, operationClientPackage,
+                    operationClientUid)) {
+                finishDenied(event.decision);
+            } else showHostRecoveryRequired();
+            return;
+        }
+
+        if (operation.kind == ExternalActivityOperation.Kind.REVOKE) {
+            if ("REVOKED".equals(event.decision)
+                    && !clearRecordIfOwned(event.leaseId, operationClientPackage,
+                            operationClientUid)) {
+                status.setText("Broker cleanup completed, but controller state is unresolved.");
+                return;
+            }
+            Intent result = new Intent().putExtra(
+                    ClientRequestContract.EXTRA_DECISION, event.decision);
+            setResult("REVOKED".equals(event.decision) ? RESULT_OK : RESULT_CANCELED,
+                    result);
+            finish();
+            return;
+        }
+
+        if ("REVOKED".equals(event.decision) || "NOT_FOUND".equals(event.decision)) {
+            OwnedRecord current = ownedRecord(operationClientPackage, operationClientUid);
+            if (current == null || (event.leaseId.equals(current.leaseId)
+                    && clearRecordIfOwned(event.leaseId, operationClientPackage,
+                            operationClientUid)))
+                finishDenied("REVOKED_AFTER_UNCERTAIN_RESULT");
+            else showHostRecoveryRequired();
+        } else showHostRecoveryRequired();
     }
 
     private boolean saveSubmitting(LeaseRequest lease, long generation) {
@@ -486,6 +577,17 @@ public final class ClientRequestActivity extends Activity {
                 && left.durationMillis == right.durationMillis
                 && left.clientPackage.equals(right.clientPackage)
                 && left.style == right.style;
+    }
+
+    private static String fingerprint(ExternalClientPolicy.ApprovedThemeRequest request) {
+        return "REQUEST\n" + request.clientPackage + "\n" + request.clientUid + "\n"
+                + request.seedArgb + "\n"
+                + request.style.name() + "\n" + request.durationMillis;
+    }
+
+    private static String fingerprint(String action, CallerEvidence caller, String payload) {
+        return action + "\n" + caller.packageName + "\n" + caller.uid + "\n"
+                + caller.versionCode + "\n" + payload;
     }
 
     private static final class OwnedRecord {

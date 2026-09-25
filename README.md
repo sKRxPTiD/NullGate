@@ -45,7 +45,7 @@ artifacts, verifies APK signatures and records SHA-256 checksums, then runs
 simulated device-helper tests. Device tests now run after artifacts exist, so
 the build no longer depends on a previous dist directory.
 
-Current result: **135 host Java checks** (67 broker/security, 36 external-client
+Current result: **151 host Java checks** (67 broker/security, 52 external-client
 policy/state, and 32 test-client response/lifecycle checks) and the stateful device-helper scenario suite pass, including
 additional final-review regressions.
 These do not execute Android socket, SELinux, Activity lifecycle, app_process,
@@ -59,6 +59,9 @@ conditional approval of the supervised first-party external-client theme test.
 That test subsequently stopped safely on theme-triggered Activity recreation:
 the grant was revoked and exact restoration verified. External-client success
 remains blocked pending the lifecycle repair in `DEVICE_TEST_2026-09-25.md`.
+The bounded repair now retains one authenticated operation across configuration
+recreation while leaving process-death recovery fail-closed. It awaits the
+next reviewed PiXi run; see `LIFECYCLE_REPAIR_2026-09-25.md`.
 
 Outputs:
 - `dist/NullGate-prototype-debug.apk`
