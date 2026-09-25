@@ -59,9 +59,11 @@ conditional approval of the supervised first-party external-client theme test.
 That test subsequently stopped safely on theme-triggered Activity recreation:
 the grant was revoked and exact restoration verified. External-client success
 remains blocked pending the lifecycle repair in `DEVICE_TEST_2026-09-25.md`.
-The bounded repair now retains one authenticated operation across configuration
-recreation while leaving process-death recovery fail-closed. It awaits the
-next reviewed PiXi run; see `LIFECYCLE_REPAIR_2026-09-25.md`.
+The bounded repair retains one authenticated operation across configuration
+recreation while leaving process-death recovery fail-closed. The reviewed
+rerun passed real grant delivery, immediate revoke, natural expiry, exact theme
+restoration and clean shutdown. See `DEVICE_TEST_PASS_2026-09-25.md` for the
+current first-party test result; third-party compatibility remains unverified.
 
 Outputs:
 - `dist/NullGate-prototype-debug.apk`
