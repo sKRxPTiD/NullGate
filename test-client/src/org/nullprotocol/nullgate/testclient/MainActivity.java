@@ -19,23 +19,22 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import java.security.MessageDigest;
+import org.nullprotocol.nullgate.protocol.ExternalClientContract;
 
 /** First-party external-app harness. It receives a receipt, never root access. */
 public final class MainActivity extends Activity {
     private static final String CONTROLLER_PACKAGE = "org.nullprotocol.nullgate";
     private static final String CONTROLLER_ACTIVITY =
             "org.nullprotocol.nullgate.ClientRequestActivity";
-    private static final String ACTION_REQUEST =
-            "org.nullprotocol.nullgate.action.REQUEST_THEME_LEASE";
-    private static final String ACTION_REVOKE =
-            "org.nullprotocol.nullgate.action.REVOKE_LEASE";
-    private static final String EXTRA_PROTOCOL_VERSION = "protocolVersion";
-    private static final String EXTRA_SEED_ARGB = "seedArgb";
-    private static final String EXTRA_THEME_STYLE = "themeStyle";
-    private static final String EXTRA_DURATION_MILLIS = "durationMillis";
-    private static final String EXTRA_DECISION = "decision";
-    private static final String EXTRA_LEASE_ID = "leaseId";
-    private static final String EXTRA_EXPIRES_ELAPSED = "expiresElapsed";
+    private static final String ACTION_REQUEST = ExternalClientContract.ACTION_REQUEST_THEME;
+    private static final String ACTION_REVOKE = ExternalClientContract.ACTION_REVOKE;
+    private static final String EXTRA_PROTOCOL_VERSION = ExternalClientContract.EXTRA_PROTOCOL_VERSION;
+    private static final String EXTRA_SEED_ARGB = ExternalClientContract.EXTRA_SEED_ARGB;
+    private static final String EXTRA_THEME_STYLE = ExternalClientContract.EXTRA_THEME_STYLE;
+    private static final String EXTRA_DURATION_MILLIS = ExternalClientContract.EXTRA_DURATION_MILLIS;
+    private static final String EXTRA_DECISION = ExternalClientContract.EXTRA_DECISION;
+    private static final String EXTRA_LEASE_ID = ExternalClientContract.EXTRA_LEASE_ID;
+    private static final String EXTRA_EXPIRES_ELAPSED = ExternalClientContract.EXTRA_EXPIRES_ELAPSED;
     private static final int REQUEST_LEASE = 1001;
     private static final int REQUEST_REVOKE = 1002;
     private static final int TEST_SEED_ARGB = 0xff876a4b;

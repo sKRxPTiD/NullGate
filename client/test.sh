@@ -6,6 +6,7 @@ rm -rf "$OUT"
 mkdir -p "$OUT"
 javac --release 8 -d "$OUT" \
   "$BASE_DIR/common/src/org/nullprotocol/nullgate/protocol/CapabilityPayload.java" \
+  "$BASE_DIR/common/src/org/nullprotocol/nullgate/protocol/ExternalClientContract.java" \
   "$BASE_DIR/src/org/nullprotocol/nullgate/ClientRequestContract.java" \
   "$BASE_DIR/src/org/nullprotocol/nullgate/ExternalClientPolicy.java" \
   "$BASE_DIR/client/test/org/nullprotocol/nullgate/ExternalClientPolicyTest.java"

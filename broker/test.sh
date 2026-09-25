@@ -17,4 +17,5 @@ java -cp "$TEST_OUT" org.nullprotocol.nullgate.broker.EphemeralMarkerRecordTest
 java -cp "$TEST_OUT" org.nullprotocol.nullgate.broker.ShizukuSessionAdapterTest
 java -cp "$TEST_OUT" org.nullprotocol.nullgate.broker.ShizukuBrokerIntegrationTest
 java -cp "$TEST_OUT" org.nullprotocol.nullgate.broker.SystemThemeSeedAdapterTest
+java -cp "$TEST_OUT" org.nullprotocol.nullgate.broker.BoundedInputTest
 java -cp "$TEST_OUT" org.nullprotocol.nullgate.broker.SecurityRegressionTest

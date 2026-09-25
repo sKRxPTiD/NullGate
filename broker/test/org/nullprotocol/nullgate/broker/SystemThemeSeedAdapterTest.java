@@ -4,11 +4,14 @@ import org.nullprotocol.nullgate.protocol.CapabilityPayload;
 
 public final class SystemThemeSeedAdapterTest {
     private static final class Backend implements SystemThemeSeedAdapter.Backend {
-        String value = "original"; boolean available = true, failApply, failRestore;
+        String value = "original"; boolean available = true, failSnapshot, failApply, failRestore;
         String recorded; boolean hasRecord;
+        int restoreCalls, clearCalls;
         int seed; CapabilityPayload.ThemeStyle style;
         public boolean available() { return available; }
-        public String snapshot() { return value; }
+        public String snapshot() throws Exception {
+            if (failSnapshot) throw new Exception("snapshot"); return value;
+        }
         public void recordSnapshot(String snapshot) { recorded=snapshot; hasRecord=true; }
         public void apply(int seed, CapabilityPayload.ThemeStyle style) throws Exception {
             if (failApply) throw new Exception("apply"); this.seed=seed; this.style=style; value="changed";
@@ -17,15 +20,15 @@ public final class SystemThemeSeedAdapterTest {
             return value.equals("changed") && this.seed == seed && this.style == style;
         }
         public void restore(String snapshot) throws Exception {
-            if (failRestore) throw new Exception("restore"); value=snapshot;
+            restoreCalls++; if (failRestore) throw new Exception("restore"); value=snapshot;
         }
         public boolean matchesSnapshot(String snapshot) { return java.util.Objects.equals(value,snapshot); }
-        public void clearSnapshotRecord() { hasRecord=false; recorded=null; }
+        public void clearSnapshotRecord() { clearCalls++; hasRecord=false; recorded=null; }
     }
     public static void main(String[] args) throws Exception {
-        appliesAndRestores(); expiresThroughBroker(); failedApplyRollsBack();
+        appliesAndRestores(); expiresThroughBroker(); snapshotFailureDoesNotWrite(); failedApplyRollsBack();
         cleanupFailureStaysOwned(); rejectsUntypedLease();
-        System.out.println("NullGate system-theme adapter tests: 5 passed");
+        System.out.println("NullGate system-theme adapter tests: 6 passed");
     }
     static void appliesAndRestores() throws Exception {
         Backend b=new Backend(); SystemThemeSeedAdapter a=new SystemThemeSeedAdapter(b); LeaseEnvelope l=lease();
@@ -47,6 +50,14 @@ public final class SystemThemeSeedAdapterTest {
         Backend b=new Backend(); b.failApply=true;
         try { new SystemThemeSeedAdapter(b).activate(lease()); throw new AssertionError(); }
         catch(Exception expected){} check("original".equals(b.value));
+    }
+    static void snapshotFailureDoesNotWrite() {
+        Backend b=new Backend(); b.failSnapshot=true;
+        SystemThemeSeedAdapter a=new SystemThemeSeedAdapter(b);
+        try { a.activate(lease()); throw new AssertionError(); }
+        catch(Exception expected){}
+        check("original".equals(b.value) && b.restoreCalls==0 && b.clearCalls==0
+                && !b.hasRecord && a.isReady("android"));
     }
     static void cleanupFailureStaysOwned() throws Exception {
         Backend b=new Backend(); SystemThemeSeedAdapter a=new SystemThemeSeedAdapter(b); LeaseEnvelope l=lease();

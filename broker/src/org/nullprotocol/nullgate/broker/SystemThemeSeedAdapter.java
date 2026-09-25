@@ -18,6 +18,9 @@ public final class SystemThemeSeedAdapter implements CapabilityAdapter {
     private final Backend backend;
     private String ownedLeaseId;
     private String prior;
+    private boolean baselineCaptured;
+    private boolean snapshotWriteAttempted;
+    private boolean mutationMayHaveOccurred;
 
     public SystemThemeSeedAdapter(Backend backend) { this.backend = backend; }
 
@@ -31,19 +34,22 @@ public final class SystemThemeSeedAdapter implements CapabilityAdapter {
         requireLease(lease);
         if (!isReady(lease.targetPackage)) throw new SecurityException("system theme backend unavailable");
         ownedLeaseId = lease.leaseId;
-        prior = backend.snapshot();
         try {
+            prior = backend.snapshot();
+            baselineCaptured = true;
+            snapshotWriteAttempted = true;
             backend.recordSnapshot(prior);
+            mutationMayHaveOccurred = true;
             backend.apply(lease.payload.seedArgb, lease.payload.themeStyle);
             if (!backend.matches(lease.payload.seedArgb, lease.payload.themeStyle))
                 throw new SecurityException("system theme change could not be verified");
         } catch (Exception failure) {
+            if (!baselineCaptured) {
+                resetOwnership();
+                throw failure;
+            }
             try {
-                backend.restore(prior);
-                if (!backend.matchesSnapshot(prior))
-                    throw new SecurityException("system theme rollback could not be verified");
-                backend.clearSnapshotRecord();
-                ownedLeaseId = null; prior = null;
+                cleanupOwnedState();
             } catch (Exception cleanupFailure) { failure.addSuppressed(cleanupFailure); }
             throw failure;
         }
@@ -53,11 +59,27 @@ public final class SystemThemeSeedAdapter implements CapabilityAdapter {
         requireLease(lease);
         if (ownedLeaseId == null) return;
         if (!ownedLeaseId.equals(lease.leaseId)) throw new SecurityException("lease does not own theme state");
-        backend.restore(prior);
-        if (!backend.matchesSnapshot(prior))
-            throw new SecurityException("system theme restoration could not be verified");
-        backend.clearSnapshotRecord();
-        ownedLeaseId = null; prior = null;
+        cleanupOwnedState();
+    }
+
+    private void cleanupOwnedState() throws Exception {
+        if (!baselineCaptured)
+            throw new IllegalStateException("theme baseline was never captured");
+        if (mutationMayHaveOccurred) {
+            backend.restore(prior);
+            if (!backend.matchesSnapshot(prior))
+                throw new SecurityException("system theme restoration could not be verified");
+        }
+        if (snapshotWriteAttempted) backend.clearSnapshotRecord();
+        resetOwnership();
+    }
+
+    private void resetOwnership() {
+        ownedLeaseId = null;
+        prior = null;
+        baselineCaptured = false;
+        snapshotWriteAttempted = false;
+        mutationMayHaveOccurred = false;
     }
 
     private static void requireLease(LeaseEnvelope lease) {
