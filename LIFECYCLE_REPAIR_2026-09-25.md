@@ -26,10 +26,16 @@ record rather than reconstructing a grant from preferences.
 
 ## Verification
 
-The signed build passes 151 host checks plus the stateful device-helper suite.
+The signed build passes 153 host checks plus the stateful device-helper suite.
 The new checks cover single dispatch, identity matching, listener replacement,
 a result arriving before the recreated UI attaches, one-time result claim,
 continuation into cleanup and distinct issue/cleanup transport failures.
+
+Review follow-up: listener attachment now waits until onResume, and onPause
+detaches it. Queued callbacks cannot claim a result through a paused Activity.
+This also prevents synchronous delivery during partially initialized onCreate.
+Recovery-required state is retained across recreation instead of being replaced
+by a misleading progress message.
 
 The resumed PiXi gate must reproduce the configuration recreation observed in
 the failed run, then pass immediate revoke, natural expiry, exact restoration,

@@ -58,6 +58,7 @@ public final class ExternalActivityOperation {
     private boolean started;
     private Event event;
     private Listener listener;
+    private boolean recoveryRequired;
 
     public ExternalActivityOperation(Kind kind, String fingerprint,
             long approvalGeneration) {
@@ -80,6 +81,10 @@ public final class ExternalActivityOperation {
     }
 
     public synchronized boolean isStarted() { return started; }
+
+    public synchronized void requireRecovery() { recoveryRequired = true; }
+
+    public synchronized boolean isRecoveryRequired() { return recoveryRequired; }
 
     public void attach(Listener next) {
         boolean notify;

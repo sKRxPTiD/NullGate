@@ -49,7 +49,12 @@ public final class ExternalActivityOperationTest {
         detached.attach(() -> late[0]++);
         check(late[0] == 1);
         check(detached.pendingEvent() == result && detached.claim(result));
-        System.out.println("NullGate external Activity-operation checks: 16 passed");
+        check(!detached.isRecoveryRequired());
+        detached.requireRecovery();
+        detached.detach(oldUi);
+        detached.attach(newUi);
+        check(detached.isRecoveryRequired());
+        System.out.println("NullGate external Activity-operation checks: 18 passed");
     }
 
     private static void check(boolean value) { if (!value) throw new AssertionError(); }

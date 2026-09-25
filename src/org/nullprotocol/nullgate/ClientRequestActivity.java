@@ -35,9 +35,10 @@ public final class ClientRequestActivity extends Activity {
     private TextView status;
     private Button approveButton;
     private Button denyButton;
+    private boolean resumed;
     private final ExternalActivityOperation.Listener operationListener = () ->
             runOnUiThread(() -> {
-                if (!isFinishing() && !isDestroyed()) handleOperationEvent();
+                if (resumed && !isFinishing() && !isDestroyed()) handleOperationEvent();
             });
 
     @Override public void onCreate(Bundle state) {
@@ -111,6 +112,21 @@ public final class ClientRequestActivity extends Activity {
 
     @Override public Object onRetainNonConfigurationInstance() { return operation; }
 
+    @Override protected void onResume() {
+        super.onResume();
+        resumed = true;
+        if (operation != null && !isFinishing()) {
+            if (operation.isRecoveryRequired()) showHostRecoveryRequired();
+            else attachOperation();
+        }
+    }
+
+    @Override protected void onPause() {
+        resumed = false;
+        if (operation != null) operation.detach(operationListener);
+        super.onPause();
+    }
+
     @Override protected void onDestroy() {
         if (operation != null) operation.detach(operationListener);
         super.onDestroy();
@@ -128,7 +144,9 @@ public final class ClientRequestActivity extends Activity {
         return true;
     }
 
-    private void attachOperation() { operation.attach(operationListener); }
+    private void attachOperation() {
+        if (resumed) operation.attach(operationListener);
+    }
 
     private static final class CallerEvidence {
         final String packageName; final int uid; final long versionCode;
@@ -387,7 +405,7 @@ public final class ClientRequestActivity extends Activity {
             if ("REVOKED".equals(event.decision)
                     && !clearRecordIfOwned(event.leaseId, operationClientPackage,
                             operationClientUid)) {
-                status.setText("Broker cleanup completed, but controller state is unresolved.");
+                showHostRecoveryRequired();
                 return;
             }
             Intent result = new Intent().putExtra(
@@ -462,6 +480,7 @@ public final class ClientRequestActivity extends Activity {
     }
 
     private void showHostRecoveryRequired() {
+        if (operation != null) operation.requireRecovery();
         if (approveButton != null) approveButton.setEnabled(false);
         if (denyButton != null) denyButton.setEnabled(false);
         status.setText("Cleanup is unconfirmed. Keep PiXi connected and use NullGate host recovery.");
