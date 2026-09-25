@@ -19,6 +19,7 @@ privilege.
 | Adapter failure | Partial activation or cleanup blocks new admissions | Broker regression tests passed |
 | Adapter registry | Duplicate package-capability registration is rejected | Broker registry tests passed |
 | Concurrent capacity | New grants stop at the active-lease policy ceiling | One-active-lease policy test passed |
+| Request rate | New requests stop at the per-client elapsed-time ceiling | Persistent-window policy tests passed |
 | External app | Officially signed client build on PiXi | Pending upstream ColorBlendr adoption |
 
 ## Adding a new client

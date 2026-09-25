@@ -35,6 +35,8 @@ confirmed.
 - [ ] The package-capability adapter registration is unique and cannot be shadowed.
 - [ ] Lease duration has a hard upper bound.
 - [ ] Concurrent active leases stay within the explicit broker policy ceiling.
+- [ ] New requests use the controller's persistent per-client rate window;
+      revoke and reconciliation are never blocked by that admission limit.
 - [ ] Activation is verified after the write.
 - [ ] The exact prior state is recorded before mutation.
 - [ ] Expiry and revoke restore the recorded state.

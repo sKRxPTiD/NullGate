@@ -23,6 +23,9 @@ import java.security.MessageDigest;
 /** User-confirmed, typed app-to-controller entry point. It never exposes the root broker. */
 public final class ClientRequestActivity extends Activity {
     private static final String STORE = "external_client_leases";
+    private static final String RATE_STORE = "external_client_request_rate";
+    private static final long RATE_WINDOW_MILLIS = 60_000L;
+    private static final int MAX_REQUESTS_PER_WINDOW = 6;
     private static final Object STATE_LOCK = new Object();
     private static final java.util.concurrent.ExecutorService TRANSPORT =
             java.util.concurrent.Executors.newSingleThreadExecutor();
@@ -87,6 +90,16 @@ public final class ClientRequestActivity extends Activity {
             String fingerprint = fingerprint(approved);
             setContentView(buildConfirmation());
             if (!restoreRetained(ExternalActivityOperation.Kind.REQUEST, fingerprint)) {
+                final boolean rateAllowed;
+                try { rateAllowed = reserveRequestRate(approved.clientPackage); }
+                catch (RuntimeException stateFailure) {
+                    finishDenied("DENIED_RECOVERY_RECORD_FAILED");
+                    return;
+                }
+                if (!rateAllowed) {
+                    finishDenied("CAPACITY_EXHAUSTED");
+                    return;
+                }
                 approvalGeneration = reserveApprovalGeneration();
                 if (approvalGeneration < 0) {
                     finishDenied("DENIED_RECOVERY_RECORD_FAILED");
@@ -508,6 +521,23 @@ public final class ClientRequestActivity extends Activity {
             SharedPreferences prefs = store();
             long next = nextGeneration(prefs.getLong("approval_generation", 0L));
             return prefs.edit().putLong("approval_generation", next).commit() ? next : -1L;
+        }
+    }
+
+    private boolean reserveRequestRate(String clientPackage) {
+        synchronized (STATE_LOCK) {
+            SharedPreferences rate = getSharedPreferences(RATE_STORE, MODE_PRIVATE);
+            String startKey = "window_start:" + clientPackage;
+            String countKey = "request_count:" + clientPackage;
+            ExternalRequestRatePolicy.Decision decision = ExternalRequestRatePolicy.evaluate(
+                    SystemClock.elapsedRealtime(), rate.getLong(startKey, -1L),
+                    rate.getInt(countKey, -1), RATE_WINDOW_MILLIS,
+                    MAX_REQUESTS_PER_WINDOW);
+            if (!decision.allowed) return false;
+            if (!rate.edit().putLong(startKey, decision.windowStartElapsed)
+                    .putInt(countKey, decision.requestCount).commit())
+                throw new IllegalStateException("request-rate state could not be saved");
+            return true;
         }
     }
 

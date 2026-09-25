@@ -70,6 +70,8 @@ The controller now contains the first implementation slice:
 - ColorBlendr UID, sole-package, and current-signer verification;
 - a closed registry that binds each reviewed package, version, signer policy,
   and allowed capability;
+- a persistent per-client admission window limited to six new requests per
+  elapsed minute; revoke and reconciliation remain available for cleanup;
 - typed seed/style/duration parsing;
 - an obscured-touch-protected confirmation screen;
 - persisted uncertain-outcome recovery and caller-bound revocation;
