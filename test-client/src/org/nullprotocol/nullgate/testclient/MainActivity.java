@@ -20,6 +20,7 @@ import android.widget.TextView;
 
 import java.security.MessageDigest;
 import org.nullprotocol.nullgate.protocol.ExternalClientContract;
+import org.nullprotocol.nullgate.protocol.ExternalResultPolicy;
 
 /** First-party external-app harness. It receives a receipt, never root access. */
 public final class MainActivity extends Activity {
@@ -168,14 +169,14 @@ public final class MainActivity extends Activity {
     private void handleLeaseResult(int resultCode, Intent data) {
         if (data != null && data.getExtras() != null) {
             String decision = data.getStringExtra(EXTRA_DECISION);
-            TestClientResponsePolicy.Evaluation evaluated =
-                    TestClientResponsePolicy.evaluateLeaseResult(
+            ExternalResultPolicy.Evaluation evaluated =
+                    ExternalResultPolicy.evaluateLeaseResult(
                             resultCode == RESULT_OK, resultCode == RESULT_CANCELED,
                             data.getExtras().keySet(), decision,
                             data.getStringExtra(EXTRA_LEASE_ID),
                             data.getLongExtra(EXTRA_EXPIRES_ELAPSED, -1L),
-                            SystemClock.elapsedRealtime());
-            if (evaluated.outcome == TestClientResponsePolicy.Outcome.GRANT) {
+                            SystemClock.elapsedRealtime(), TEST_DURATION_MILLIS);
+            if (evaluated.outcome == ExternalResultPolicy.Outcome.GRANT) {
                 if (store().edit().putString(EXTRA_LEASE_ID, evaluated.receipt.leaseId)
                         .putLong(EXTRA_EXPIRES_ELAPSED, evaluated.receipt.expiresElapsed)
                         .putString("phase", TestClientStatePolicy.ACTIVE).commit()) {
@@ -184,7 +185,7 @@ public final class MainActivity extends Activity {
                     return;
                 }
             }
-            if (evaluated.outcome == TestClientResponsePolicy.Outcome.CLEAN
+            if (evaluated.outcome == ExternalResultPolicy.Outcome.CLEAN
                     && store().edit().clear().commit()) {
                 status.setText("Not granted: " + decision);
                 refreshButtons(TestClientStatePolicy.CLEAN);
@@ -199,7 +200,7 @@ public final class MainActivity extends Activity {
     private void handleRevokeResult(int resultCode, Intent data) {
         try {
             String decision = validatedDecision(data, false);
-            if (TestClientResponsePolicy.isConfirmedRevoke(
+            if (ExternalResultPolicy.isConfirmedRevoke(
                     resultCode == RESULT_OK, data.getExtras().keySet(), decision)) {
                 if (store().edit().clear().commit())
                     status.setText("REVOKED: NullGate confirmed cleanup.");
@@ -221,14 +222,11 @@ public final class MainActivity extends Activity {
     private void handleReconcileResult(int resultCode, Intent data) {
         if (data != null && data.getExtras() != null) {
             String decision = data.getStringExtra(EXTRA_DECISION);
-            TestClientResponsePolicy.Evaluation evaluated =
-                    TestClientResponsePolicy.evaluateReconcileResult(
-                            resultCode == RESULT_OK, resultCode == RESULT_CANCELED,
-                            data.getExtras().keySet(), decision,
-                            data.getStringExtra(EXTRA_LEASE_ID),
-                            data.getLongExtra(EXTRA_EXPIRES_ELAPSED, -1L),
-                            SystemClock.elapsedRealtime());
-            if (evaluated.outcome == TestClientResponsePolicy.Outcome.CLEAN) {
+            ExternalResultPolicy.Evaluation evaluated =
+                    ExternalResultPolicy.evaluateReconcileResult(
+                            resultCode == RESULT_CANCELED,
+                            data.getExtras().keySet(), decision);
+            if (evaluated.outcome == ExternalResultPolicy.Outcome.CLEAN) {
                 if (store().edit().clear().commit()) {
                     status.setText("Reconciled clean: no active external lease remains.");
                     refreshButtons(TestClientStatePolicy.CLEAN);
@@ -244,7 +242,7 @@ public final class MainActivity extends Activity {
     private String validatedDecision(Intent data, boolean leaseResponse) {
         if (data == null || data.getExtras() == null)
             throw new SecurityException("missing result");
-        return TestClientResponsePolicy.validateDecision(
+        return ExternalResultPolicy.validateDecision(
                 data.getExtras().keySet(), data.getStringExtra(EXTRA_DECISION), leaseResponse);
     }
 

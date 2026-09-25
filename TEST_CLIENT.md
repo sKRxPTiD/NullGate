@@ -20,6 +20,10 @@ must contain a bounded lease identifier and an expiration that is still in the
 future but no more than 60 seconds away. Revocation is confirmed only by an
 exact decision-only result carrying `REVOKED`.
 
+The harness uses the shared `ExternalResultPolicy` from the protocol module, so
+its grant, denial, revoke, and reconciliation decisions exercise the same
+app-neutral result contract intended for future first-party clients.
+
 It receives no root identity, shell, file descriptor, Binder service, arbitrary
 command channel, or direct broker connection.
 

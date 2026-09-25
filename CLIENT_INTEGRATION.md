@@ -84,6 +84,11 @@ signed APK cannot replace or impersonate the official package. Android
 instrumentation and process-death testing require an officially signed upstream
 release, followed by review and admission of that release version in NullGate.
 
+`common/.../ExternalResultPolicy.java` is the canonical fail-closed result
+policy for first-party clients. It accepts only exact result schemas, bounded
+fresh grant receipts, operation-specific revoke confirmation, and explicit
+clean reconciliation decisions. Everything else remains `UNKNOWN`.
+
 For a new app or capability, start with `ADAPTER_AUTHORING_GUIDE.md` and record
 the evidence in `UNIVERSAL_TEST_MATRIX.md`. ColorBlendr remains the first test
 client, not a special privilege path.

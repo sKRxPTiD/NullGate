@@ -11,6 +11,7 @@ privilege.
 | Client scope | Registered package is limited to named capabilities | Passed for ColorBlendr and first-party test client |
 | Approval | Visible, result-bound, obscured-touch-protected confirmation | Passed in supervised PiXi test |
 | Grant receipt | Correlated lease ID and bounded expiry | Passed with first-party test client |
+| Result policy | Exact schemas; ambiguous or future decisions remain unknown | Passed through shared protocol policy |
 | Immediate revoke | Revoke returns confirmed cleanup | Passed with first-party test client |
 | Natural expiry | State restores exactly at lease expiry | Passed with first-party test client |
 | Lost result | Unknown state survives and requires reconciliation | Host policy and lifecycle tests passed |

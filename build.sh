@@ -68,6 +68,7 @@ javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/client-reference" \
   -o "$OUT_DIR/test-client-base.apk"
 javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/test-client-classes" \
   "$BASE_DIR/common/src/org/nullprotocol/nullgate/protocol/ExternalClientContract.java" \
+  "$BASE_DIR/common/src/org/nullprotocol/nullgate/protocol/ExternalResultPolicy.java" \
   $(find "$BASE_DIR/test-client/src" -name '*.java' -print)
 "$BUILD_TOOLS/d8" --min-api 26 --lib "$ANDROID_JAR" --output "$OUT_DIR/test-client-dex" \
   $(find "$OUT_DIR/test-client-classes" -name '*.class' -print)
