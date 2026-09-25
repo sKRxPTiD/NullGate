@@ -6,11 +6,11 @@ scenario="${FAKE_SCENARIO:-ready}"
 cert_file="${FAKE_CERT_FILE:?}"
 broker_file="${FAKE_BROKER_FILE:?}"
 # Test-owned state file contains only these numeric flags.
-installed=0 runtime=0 broker=0 running=0 pid_receipt=0 leases=0 unknown=0 test_client=0
+installed=0 runtime=0 broker=0 running=0 pid_receipt=0 leases=0 unknown=0 test_client=0 theme_snapshot=0
 [[ -f "$state_file" ]] && source "$state_file"
 
 save() {
-  printf 'installed=%s runtime=%s broker=%s running=%s pid_receipt=%s leases=%s unknown=%s test_client=%s\n'     "$installed" "$runtime" "$broker" "$running" "$pid_receipt" "$leases" "$unknown" "$test_client" > "$state_file"
+  printf 'installed=%s runtime=%s broker=%s running=%s pid_receipt=%s leases=%s unknown=%s test_client=%s theme_snapshot=%s\n'     "$installed" "$runtime" "$broker" "$running" "$pid_receipt" "$leases" "$unknown" "$test_client" "$theme_snapshot" > "$state_file"
 }
 
 if [[ "${1:-}" == get-serialno ]]; then
@@ -24,6 +24,10 @@ fi
 shift 2
 
 if [[ "${1:-}" == pull ]]; then
+  if [[ "${2:-}" == /data/local/tmp/nullgate/theme.snapshot && "$theme_snapshot" == 1 ]]; then
+    printf 'VALUE\n{"android.theme.customization.color_source":"home_wallpaper"}\n' > "$3"
+    exit 0
+  fi
   [[ "$installed" == 1 || "$test_client" == 1 || "${2:-}" == */broker.log ]] || exit 1
   printf 'test artifact\n' > "$3"
   exit 0
@@ -144,11 +148,22 @@ case "$request" in
     [[ "$broker" == 1 ]] && printf '%s\n' NullGate-broker.jar broker.log
     [[ "$leases" == 1 ]] && echo leases
     [[ "$unknown" == 1 ]] && echo unexpected
+    [[ "$theme_snapshot" == 1 ]] && echo theme.snapshot
     true ;;
+  "shell if test -L /data/local/tmp/nullgate/theme.snapshot; then echo SYMLINK; elif test -f /data/local/tmp/nullgate/theme.snapshot; then stat -c 'FILE:%u:%a:%s' /data/local/tmp/nullgate/theme.snapshot; elif test -e /data/local/tmp/nullgate/theme.snapshot; then echo OTHER; else echo ABSENT; fi")
+    if [[ "$scenario" == theme-recovery-unsafe ]]; then echo SYMLINK
+    elif [[ "$theme_snapshot" == 1 ]]; then echo FILE:0:600:70
+    else echo ABSENT; fi ;;
+  "shell cmd settings put secure theme_customization_overlay_packages '{\"android.theme.customization.color_source\":\"home_wallpaper\"}'")
+    [[ "$scenario" == theme-recovery && "$theme_snapshot" == 1 ]] ;;
+  "shell settings get secure theme_customization_overlay_packages")
+    echo '{"android.theme.customization.color_source":"home_wallpaper"}' ;;
+  "shell rm -f /data/local/tmp/nullgate/theme.snapshot")
+    theme_snapshot=0; save ;;
   "shell test ! -e /data/local/tmp/nullgate/leases || rmdir /data/local/tmp/nullgate/leases")
     [[ "$leases" == 0 ]] ;;
   "shell rm -f /data/local/tmp/nullgate/NullGate-broker.jar /data/local/tmp/nullgate/broker.log && rmdir /data/local/tmp/nullgate")
-    [[ "$scenario" != cleanup-fail && "$running" == 0 && "$leases" == 0 && "$unknown" == 0 ]] || exit 1
+    [[ "$scenario" != cleanup-fail && "$running" == 0 && "$leases" == 0 && "$unknown" == 0 && "$theme_snapshot" == 0 ]] || exit 1
     runtime=0; broker=0; save ;;
   *) echo "fake-adb: unexpected request: $request" >&2; exit 64 ;;
 esac

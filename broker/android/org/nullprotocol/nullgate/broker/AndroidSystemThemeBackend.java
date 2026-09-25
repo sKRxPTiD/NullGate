@@ -4,9 +4,8 @@ import android.content.Context;
 import android.os.SystemClock;
 import org.json.JSONObject;
 import org.nullprotocol.nullgate.protocol.CapabilityPayload;
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.FutureTask;
 import java.io.File;
 
 /** Fixed settings-tool implementation; no general shell API or caller-supplied JSON. */
@@ -80,7 +79,13 @@ public final class AndroidSystemThemeBackend implements SystemThemeSeedAdapter.B
     }
 
     @Override public void clearSnapshotRecord() throws Exception {
-        android.system.StructStat stat = android.system.Os.lstat(SNAPSHOT);
+        android.system.StructStat stat;
+        try {
+            stat = android.system.Os.lstat(SNAPSHOT);
+        } catch (android.system.ErrnoException absent) {
+            if (absent.errno == android.system.OsConstants.ENOENT) return;
+            throw absent;
+        }
         if (!android.system.OsConstants.S_ISREG(stat.st_mode) || stat.st_uid != 0
                 || (stat.st_mode & 0777) != 0600)
             throw new SecurityException("unsafe theme snapshot receipt");
@@ -108,13 +113,23 @@ public final class AndroidSystemThemeBackend implements SystemThemeSeedAdapter.B
         java.util.Collections.addAll(command, arguments);
         ProcessBuilder builder = new ProcessBuilder(command);
         Process process = builder.redirectErrorStream(true).start();
+        FutureTask<byte[]> reader = new FutureTask<>(
+                () -> BoundedInput.readAll(process.getInputStream(), 16_386));
+        Thread drain = new Thread(reader, "NullGate-settings-output");
+        drain.setDaemon(true);
+        drain.start();
         if (!process.waitFor(5, TimeUnit.SECONDS)) {
             process.destroyForcibly();
+            drain.interrupt();
             throw new IllegalStateException("fixed settings operation timed out");
         }
-        byte[] output = readBounded(process.getInputStream(), 4096);
+        byte[] output = reader.get(1, TimeUnit.SECONDS);
+        String decoded = new String(output, java.nio.charset.StandardCharsets.UTF_8);
+        String stripped = stripLineEndings(decoded);
+        if (stripped.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 16_384)
+            throw new SecurityException("theme setting exceeds safety bound");
         return new ProcessResult(process.exitValue(),
-                new String(output, java.nio.charset.StandardCharsets.UTF_8));
+                decoded);
     }
 
     private static String stripLineEndings(String value) {
@@ -127,15 +142,5 @@ public final class AndroidSystemThemeBackend implements SystemThemeSeedAdapter.B
         final int exitCode;
         final String output;
         ProcessResult(int exitCode, String output) { this.exitCode = exitCode; this.output = output; }
-    }
-
-    private static byte[] readBounded(InputStream input, int limit) throws Exception {
-        ByteArrayOutputStream output = new ByteArrayOutputStream(); byte[] buffer = new byte[512];
-        while (output.size() < limit) {
-            int count = input.read(buffer, 0, Math.min(buffer.length, limit - output.size()));
-            if (count < 0) break;
-            output.write(buffer, 0, count);
-        }
-        return output.toByteArray();
     }
 }

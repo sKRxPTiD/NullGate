@@ -10,7 +10,7 @@ trap 'rm -rf -- "$TEST_DIR"' EXIT
 STATE="$TEST_DIR/state"
 
 set_state() {
-  printf 'installed=%s runtime=%s broker=%s running=%s pid_receipt=%s leases=%s unknown=%s test_client=%s\n'     "${1:-0}" "${2:-0}" "${3:-0}" "${4:-0}" "${5:-0}" "${6:-0}" "${7:-0}" "${8:-0}" > "$STATE"
+  printf 'installed=%s runtime=%s broker=%s running=%s pid_receipt=%s leases=%s unknown=%s test_client=%s theme_snapshot=%s\n'     "${1:-0}" "${2:-0}" "${3:-0}" "${4:-0}" "${5:-0}" "${6:-0}" "${7:-0}" "${8:-0}" "${9:-0}" > "$STATE"
 }
 
 run_helper() {
@@ -80,7 +80,7 @@ if output="$(run_helper ready install-test-client 2>&1)"; then
 fi
 [[ "$output" == *"test-client acknowledgement required"* ]]
 run_test_client_helper ready install-test-client >/dev/null
-[[ "$(cat "$STATE")" == "installed=1 runtime=0 broker=0 running=0 pid_receipt=0 leases=0 unknown=0 test_client=1" ]]
+[[ "$(cat "$STATE")" == "installed=1 runtime=0 broker=0 running=0 pid_receipt=0 leases=0 unknown=0 test_client=1 theme_snapshot=0" ]]
 set_state 1 1 1
 expect_test_client_failure ready "requires an absent broker runtime"
 set_state
@@ -140,6 +140,10 @@ run_helper ready stop >/dev/null
 run_helper ready cleanup >/dev/null
 run_helper ready verify-clean >/dev/null
 
+set_state
+expect_failure wrong-signer install-controller "local controller signer does not match"
+[[ "$(cat "$STATE")" == *"installed=0"* ]]
+
 set_state 1
 expect_failure hash-mismatch deploy "digest mismatch"
 set_state 1 1 1 1 1
@@ -154,7 +158,7 @@ set_state 1 1 1 0 0
 expect_failure cleanup-fail cleanup "runtime cleanup failed"
 set_state 1 1 1 1 1
 run_helper stale-receipt stop >/dev/null
-[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=0 leases=0 unknown=0 test_client=0" ]]
+[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=0 leases=0 unknown=0 test_client=0 theme_snapshot=0" ]]
 set_state 1 1 1 1 1
 expect_failure term-fail stop "SIGTERM failed"
 set_state 1
@@ -170,7 +174,7 @@ run_helper ready recover-marker-runtime >/dev/null
 run_helper ready verify-clean >/dev/null
 set_state 1 1 1 0 1 1
 expect_failure marker-invalid recover-marker-runtime "content failed validation"
-[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0" ]]
+[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0 theme_snapshot=0" ]]
 set_state 1 1 1 0 1 1
 expect_failure marker-unsafe recover-marker-runtime "ownership or mode"
 set_state 1 1 1 0 1 1
@@ -182,11 +186,26 @@ set_state 1 0 0 1 0
 expect_failure ready verify-clean "broker is still running"
 set_state 1 1 1 0 1 1
 expect_failure inventory-fail recover-marker-runtime "UNKNOWN"
-[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0" ]]
+[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0 theme_snapshot=0" ]]
 expect_failure proc-fail recover-marker-runtime "UNKNOWN"
-[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0" ]]
+[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0 theme_snapshot=0" ]]
+
+set_state 1 1 1 0 0 0 0 0 1
+run_theme_helper theme-recovery recover-system-theme-runtime >/dev/null
+run_theme_helper ready verify-clean >/dev/null
+set_state 1 1 1 0 0 0 0 0 1
+if output="$(run_helper theme-recovery recover-system-theme-runtime 2>&1)"; then
+  echo "marker token enabled theme recovery" >&2; exit 1
+fi
+[[ "$output" == *"system-theme acknowledgement required"* ]]
+set_state 1 1 1 0 0 0 0 0 1
+if output="$(run_theme_helper theme-recovery-unsafe recover-system-theme-runtime 2>&1)"; then
+  echo "unsafe theme receipt was accepted" >&2; exit 1
+fi
+[[ "$output" == *"absent or unsafe"* ]]
+set_state 1 1 1 0 1 1
 expect_failure reused-pid recover-marker-runtime "recorded PID still exists"
-[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0" ]]
+[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0 theme_snapshot=0" ]]
 set_state 1 1 1 1 1
 expect_failure proc-fail stop "UNKNOWN"
 echo "NullGate device harness scenarios passed, including locked test-client installation and six final-review regressions"

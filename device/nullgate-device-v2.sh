@@ -137,6 +137,15 @@ verify_package_signer() {
   [[ "$actual" =~ ^[0-9a-f]{64}$ && "$actual" == "$expected" ]]     || die "installed $label signer does not match the controller pin"
 }
 
+verify_local_apk_signer() {
+  local apk="$1" label="$2" expected actual
+  expected="$(tr -d '\r\n' < "$CERT_FILE")"
+  actual="$("$APKSIGNER_BIN" verify --print-certs "$apk" \
+    | sed -n 's/^Signer #[0-9][0-9]* certificate SHA-256 digest: //p')"
+  [[ "$actual" =~ ^[0-9a-f]{64}$ && "$actual" == "$expected" ]] \
+    || die "local $label signer does not match the controller pin"
+}
+
 broker_pid() {
   adb_device shell "if test -L $DEVICE_DIR/broker.pid; then echo SYMLINK; elif test -f $DEVICE_DIR/broker.pid; then cat $DEVICE_DIR/broker.pid; elif test -e $DEVICE_DIR/broker.pid; then echo OTHER; else echo ABSENT; fi"     | tr -d '\r\n'
 }
@@ -181,6 +190,7 @@ install_controller() {
   require_mutation_authorization
   require_artifacts
   platform_preflight
+  verify_local_apk_signer "$APK" controller
   local package_output
   package_output="$(adb_device shell pm list packages --user 0 "$PACKAGE" | tr -d '\r')"
   if [[ -n "$package_output" ]]; then
@@ -200,6 +210,7 @@ install_test_client() {
   require_mutation_authorization "$TEST_CLIENT_MUTATION_TOKEN"
   require_artifacts
   platform_preflight
+  verify_local_apk_signer "$TEST_CLIENT_APK" "test client"
   verify_installed_signer
   require_no_broker
   [[ "$(runtime_state)" == ABSENT ]] || die "test-client installation requires an absent broker runtime"
@@ -318,7 +329,8 @@ verify_no_leases() {
 }
 
 cleanup_runtime() {
-  require_mutation_authorization
+  local expected_token="${1:-$MUTATION_TOKEN}"
+  require_mutation_authorization "$expected_token"
   platform_preflight
   require_private_runtime
   require_no_broker
@@ -429,7 +441,7 @@ recover_system_theme_runtime() {
   cp -- "$receipt" "$LOG_DIR/theme-recovery-$SERIAL-$(date -u +%Y%m%dT%H%M%SZ).snapshot"
   rm -rf -- "$temp_dir"
   adb_device shell "rm -f $DEVICE_DIR/theme.snapshot" >/dev/null || die "could not remove verified theme recovery receipt"
-  cleanup_runtime
+  cleanup_runtime "$THEME_MUTATION_TOKEN"
   note "theme restored exactly from the root-owned receipt and runtime removed"
 }
 
