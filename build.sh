@@ -41,11 +41,11 @@ fi
   -I "$ANDROID_JAR" --min-sdk-version 26 --target-sdk-version 36 \
   -o "$OUT_DIR/base.apk" "$OUT_DIR/compiled-res"/*.flat
 
-javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/classes" \
-  $(find "$BASE_DIR/common/src" -name '*.java' -print) \
-  $(find "$BASE_DIR/src" -name '*.java' -print)
+mapfile -d '' -t controller_sources < <(find "$BASE_DIR/common/src" "$BASE_DIR/src" -name '*.java' -print0)
+javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/classes" "${controller_sources[@]}"
+mapfile -d '' -t controller_classes < <(find "$OUT_DIR/classes" -name '*.class' -print0)
 "$BUILD_TOOLS/d8" --min-api 26 --lib "$ANDROID_JAR" --output "$OUT_DIR/dex" \
-  $(find "$OUT_DIR/classes" -name '*.class' -print)
+  "${controller_classes[@]}"
 (cd "$OUT_DIR/dex" && zip -q -j "$OUT_DIR/base.apk" classes.dex)
 
 if [[ ! -f "$KEYPASS_FILE" ]]; then
@@ -62,8 +62,9 @@ chmod 0600 "$KEYSTORE"
 chmod 0600 "$KEY_DIR"/*.keystore
 
 # Compile the standalone client reference against the same Android API surface.
+mapfile -d '' -t reference_sources < <(find "$BASE_DIR/client/reference" -name '*.java' -print0)
 javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/client-reference" \
-  $(find "$BASE_DIR/client/reference" -name '*.java' -print)
+  "${reference_sources[@]}"
 
 # Build the first-party external-app harness as a separate package and UID.
 "$BUILD_TOOLS/aapt2" link --manifest "$BASE_DIR/test-client/AndroidManifest.xml" \
@@ -72,9 +73,11 @@ javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/client-reference" \
 javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/test-client-classes" \
   "$BASE_DIR/common/src/org/nullprotocol/nullgate/protocol/ExternalClientContract.java" \
   "$BASE_DIR/common/src/org/nullprotocol/nullgate/protocol/ExternalResultPolicy.java" \
-  $(find "$BASE_DIR/test-client/src" -name '*.java' -print)
+  "$BASE_DIR/test-client/src/org/nullprotocol/nullgate/testclient/MainActivity.java" \
+  "$BASE_DIR/test-client/src/org/nullprotocol/nullgate/testclient/TestClientStatePolicy.java"
+mapfile -d '' -t test_client_classes < <(find "$OUT_DIR/test-client-classes" -name '*.class' -print0)
 "$BUILD_TOOLS/d8" --min-api 26 --lib "$ANDROID_JAR" --output "$OUT_DIR/test-client-dex" \
-  $(find "$OUT_DIR/test-client-classes" -name '*.class' -print)
+  "${test_client_classes[@]}"
 (cd "$OUT_DIR/test-client-dex" && zip -q -j "$OUT_DIR/test-client-base.apk" classes.dex)
 
 "$BUILD_TOOLS/zipalign" -f 4 "$OUT_DIR/base.apk" "$OUT_DIR/aligned.apk"
@@ -100,10 +103,12 @@ verify_manifest_identity "$DIST_DIR/NullGate-prototype-debug.apk" org.nullprotoc
 verify_manifest_identity "$DIST_DIR/NullGate-test-client-debug.apk" org.nullprotocol.nullgate.testclient 1
 bash "$BASE_DIR/release/check-release-metadata.sh" --with-apk
 
+mapfile -d '' -t broker_sources < <(find "$BASE_DIR/common/src" "$BASE_DIR/broker/src" "$BASE_DIR/broker/android" -name '*.java' -print0)
 javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/broker-classes" \
-  $(find "$BASE_DIR/common/src" "$BASE_DIR/broker/src" "$BASE_DIR/broker/android" -name '*.java' -print)
+  "${broker_sources[@]}"
+mapfile -d '' -t broker_classes < <(find "$OUT_DIR/broker-classes" -name '*.class' -print0)
 "$BUILD_TOOLS/d8" --min-api 26 --lib "$ANDROID_JAR" --output "$OUT_DIR/broker-dex" \
-  $(find "$OUT_DIR/broker-classes" -name '*.class' -print)
+  "${broker_classes[@]}"
 (cd "$OUT_DIR/broker-dex" && zip -q -j "$DIST_DIR/NullGate-broker.jar" classes.dex)
 "$BUILD_TOOLS/apksigner" verify --print-certs "$DIST_DIR/NullGate-prototype-debug.apk" \
   | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' > "$DIST_DIR/controller-cert-sha256.txt"
