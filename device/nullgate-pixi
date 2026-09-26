@@ -155,8 +155,13 @@ recover_runtime() {
       --text="Use recovery only after the broker stopped or its 15-minute lifetime expired. The helper will refuse unsafe files or a live process. Continue?" || return
   fi
   activate_root || return 1
-  local output
-  output="$(helper_theme recover-system-theme-runtime 2>&1)" || {
+  local output snapshot_state
+  snapshot_state="$(adb_pixi shell "if test -L $RUNTIME/theme.snapshot; then echo SYMLINK; elif test -f $RUNTIME/theme.snapshot; then echo FILE; elif test -e $RUNTIME/theme.snapshot; then echo OTHER; else echo ABSENT; fi" 2>/dev/null | tr -d '\r')"
+  case "$snapshot_state" in
+    FILE) output="$(helper_theme recover-system-theme-runtime 2>&1)" ;;
+    ABSENT) output="$(helper_write recover-marker-runtime 2>&1)" ;;
+    *) fail "Recovery refused an unsafe theme-snapshot state: $snapshot_state"; return 1 ;;
+  esac || {
     fail "Recovery refused the current state. Evidence remains untouched.\n\n$output"
     return 1
   }
@@ -198,4 +203,3 @@ case "${1:-menu}" in
   recover) recover_runtime ;;
   *) printf 'Usage: nullgate-pixi {menu|start|colorblendr|stop|status|recover}\n' >&2; exit 2 ;;
 esac
-
