@@ -243,7 +243,7 @@ health_check() {
     fail "A NullGate runtime still exists: $runtime\n\nUse Status and the guarded Stop or Recovery action."
     return 1
   }
-  info "PiXi NullGate health check passed.\n\nADB: ordinary shell\nController: version 1, paired signer verified\nColorBlendr: version 42001, admitted signer verified\nRuntime: absent\nDevice writes performed: none"
+  info "PiXi NullGate health check passed.\n\nADB: ordinary shell\nController: version $controller_version, paired signer verified\nColorBlendr: version $colorblendr_version, admitted signer verified\nRuntime: absent\nDevice writes performed: none"
 }
 
 recover_runtime() {
