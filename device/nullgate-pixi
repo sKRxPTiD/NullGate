@@ -2,7 +2,7 @@
 set -uo pipefail
 
 SERIAL="54110DLAQ0043W"
-PROJECT="/home/wolf/Documents/Codex/2026-09-22/referenced-chatgpt-conversation-this-is-an/outputs/nullgate-public"
+PROJECT="/mnt/TerraDrive/Null Protocol/Apps/NullGate/source"
 HELPER="$PROJECT/device/nullgate-device-v2.sh"
 TOKEN="NULLGATE_MARKER_TEST_V1"
 THEME_TOKEN="NULLGATE_SYSTEM_THEME_V1"

@@ -10,6 +10,7 @@ DIST_DIR="$BASE_DIR/dist"
 KEY_DIR="${NULLGATE_KEY_DIR:-$BASE_DIR/keys}"
 KEYSTORE="$KEY_DIR/nullgate-local.keystore"
 KEYPASS_FILE="$KEY_DIR/.nullgate-local.pass"
+KEYPASS_FILE="${NULLGATE_KEYPASS_FILE:-$KEYPASS_FILE}"
 
 for binary in "$BUILD_TOOLS/aapt2" "$BUILD_TOOLS/d8" "$BUILD_TOOLS/zipalign" "$BUILD_TOOLS/apksigner" "$ANDROID_JAR"; do
   [[ -e "$binary" ]] || { echo "Missing Android 36 build dependency: $binary" >&2; exit 1; }
