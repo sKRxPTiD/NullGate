@@ -75,6 +75,9 @@ launcher with `device/install-dolowolf-launcher.sh`.
 ADB, the installed package versions and signing certificates, and an absent
 runtime. It does not enable root or write to PiXi.
 
+For a terminal-only health check without a desktop dialog, run
+`NULLGATE_NO_DIALOG=1 nullgate-pixi doctor`.
+
 ## ColorBlendr integration
 
 The launcher uses NullGate's typed `SYSTEM_THEME_SEED_APPLY` capability and

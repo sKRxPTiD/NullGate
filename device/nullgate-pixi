@@ -15,7 +15,7 @@ PRIVATE_PINS="$PROJECT/compat/pixi-private-pins.properties"
 info() {
   local rendered
   printf -v rendered '%b' "$1"
-  if [[ -n "${DISPLAY:-}" ]] && command -v zenity >/dev/null; then
+  if [[ "${NULLGATE_NO_DIALOG:-0}" != 1 && -n "${DISPLAY:-}" ]] && command -v zenity >/dev/null; then
     zenity --info --title="NullGate" --width=470 --text="$rendered"
   else
     printf 'NullGate: %s\n' "$rendered"
@@ -25,7 +25,7 @@ info() {
 fail() {
   local rendered
   printf -v rendered '%b' "$1"
-  if [[ -n "${DISPLAY:-}" ]] && command -v zenity >/dev/null; then
+  if [[ "${NULLGATE_NO_DIALOG:-0}" != 1 && -n "${DISPLAY:-}" ]] && command -v zenity >/dev/null; then
     zenity --error --title="NullGate stopped safely" --width=520 --text="$rendered"
   else
     printf 'NullGate: %s\n' "$rendered" >&2
@@ -248,7 +248,7 @@ health_check() {
 
 recover_runtime() {
   require_connection || return 1
-  if [[ -n "${DISPLAY:-}" ]] && command -v zenity >/dev/null; then
+  if [[ "${NULLGATE_NO_DIALOG:-0}" != 1 && -n "${DISPLAY:-}" ]] && command -v zenity >/dev/null; then
     zenity --question --title="NullGate recovery" --width=510 \
       --text="Use recovery only after the broker stopped or its 15-minute lifetime expired. The helper will refuse unsafe files or a live process. Continue?" || return
   fi
