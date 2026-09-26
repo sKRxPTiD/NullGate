@@ -10,8 +10,7 @@ PACKAGE="org.nullprotocol.nullgate"
 COLORBLENDR_PACKAGE="com.drdisagree.colorblendr"
 RUNTIME="/data/local/tmp/nullgate"
 APKSIGNER="/home/wolf/Android/Sdk/build-tools/36.0.0/apksigner"
-CONTROLLER_SIGNER="fc122f22e4716ba03cae81893783e437553d4a3ad21e897f4efe3367c415bafe"
-COLORBLENDR_SIGNER="4ea5f2d0eed34de88c25f33cbf5e0874e234be5614aae48d81a8ded413724f47"
+PRIVATE_PINS="$PROJECT/compat/pixi-private-pins.properties"
 
 info() {
   local rendered
@@ -177,6 +176,14 @@ installed_signer() {
   printf '%s\n' "$digest"
 }
 
+read_private_pin() {
+  local key="$1" value
+  [[ -f "$PRIVATE_PINS" && ! -L "$PRIVATE_PINS" ]] || return 1
+  value="$(sed -n "s/^${key}=//p" "$PRIVATE_PINS")"
+  [[ -n "$value" && "$(printf '%s\n' "$value" | wc -l)" == 1 ]] || return 1
+  printf '%s\n' "$value"
+}
+
 health_check() {
   require_connection || return 1
   [[ -x "$APKSIGNER" ]] || {
@@ -185,6 +192,24 @@ health_check() {
   }
 
   local identity controller_signer colorblendr_signer controller_version colorblendr_version runtime
+  local expected_controller_signer expected_colorblendr_signer expected_controller_version expected_colorblendr_version
+  expected_controller_signer="$(read_private_pin controller.signer.sha256)" || {
+    fail "The PiXi private controller identity pin is unavailable."
+    return 1
+  }
+  expected_colorblendr_signer="$(read_private_pin colorblendr.signer.sha256)" || {
+    fail "The PiXi private ColorBlendr identity pin is unavailable."
+    return 1
+  }
+  expected_controller_version="$(read_private_pin controller.versionCode)" || return 1
+  expected_colorblendr_version="$(read_private_pin colorblendr.versionCode)" || return 1
+  [[ "$expected_controller_signer" =~ ^[0-9a-f]{64}$ &&
+      "$expected_colorblendr_signer" =~ ^[0-9a-f]{64}$ &&
+      "$expected_controller_version" =~ ^[0-9]+$ &&
+      "$expected_colorblendr_version" =~ ^[0-9]+$ ]] || {
+    fail "The PiXi private identity metadata is malformed."
+    return 1
+  }
   identity="$(adb_pixi shell id 2>/dev/null | tr -d '\r')"
   [[ "$identity" == uid=2000\(* ]] || {
     fail "PiXi is connected, but ADB is not in its normal non-root state. Close the active session first.\n\n$identity"
@@ -198,17 +223,18 @@ health_check() {
     fail "The installed ColorBlendr fork identity could not be verified."
     return 1
   }
-  [[ "$controller_signer" == "$CONTROLLER_SIGNER" ]] || {
+  [[ "$controller_signer" == "$expected_controller_signer" ]] || {
     fail "The installed NullGate controller signer does not match the paired PiXi build."
     return 1
   }
-  [[ "$colorblendr_signer" == "$COLORBLENDR_SIGNER" ]] || {
+  [[ "$colorblendr_signer" == "$expected_colorblendr_signer" ]] || {
     fail "The installed ColorBlendr signer does not match the admitted private fork."
     return 1
   }
   controller_version="$(adb_pixi shell dumpsys package "$PACKAGE" 2>/dev/null | sed -n 's/^[[:space:]]*versionCode=\([0-9]*\).*/\1/p' | head -1 | tr -d '\r')"
   colorblendr_version="$(adb_pixi shell dumpsys package "$COLORBLENDR_PACKAGE" 2>/dev/null | sed -n 's/^[[:space:]]*versionCode=\([0-9]*\).*/\1/p' | head -1 | tr -d '\r')"
-  [[ "$controller_version" == 1 && "$colorblendr_version" == 42001 ]] || {
+  [[ "$controller_version" == "$expected_controller_version" &&
+      "$colorblendr_version" == "$expected_colorblendr_version" ]] || {
     fail "Installed version pins do not match the verified pair.\n\nController: $controller_version\nColorBlendr: $colorblendr_version"
     return 1
   }

@@ -11,6 +11,10 @@ The admitted client is exact:
 - signer SHA-256: `4ea5f2d0eed34de88c25f33cbf5e0874e234be5614aae48d81a8ded413724f47`
 - source branch: `sKRxPTiD/ColorBlendr-NullGate:pixi-private-nullgate`
 
+The machine-readable matched-set record is
+`compat/pixi-private-pins.properties`. The ordinary `compat/pins.properties`
+continues to describe the untouched upstream/official compatibility target.
+
 The APK is a local test artifact, not a public ColorBlendr release. Android
 must remove the differently signed upstream installation before this same
 package name can be installed. Wolf has stated that the existing ColorBlendr
