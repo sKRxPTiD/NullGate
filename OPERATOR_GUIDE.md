@@ -65,6 +65,8 @@ nullgate-pixi recover
 ```
 
 The desktop launcher and command both use the same guarded implementation.
+Its tracked source is `device/nullgate-pixi`. Reinstall or repair the DoloWOLF
+launcher with `device/install-dolowolf-launcher.sh`.
 
 ## ColorBlendr integration
 

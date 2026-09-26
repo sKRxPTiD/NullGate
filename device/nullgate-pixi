@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+SERIAL="54110DLAQ0043W"
+PROJECT="/home/wolf/Documents/Codex/2026-09-22/referenced-chatgpt-conversation-this-is-an/outputs/nullgate-public"
+HELPER="$PROJECT/device/nullgate-device-v2.sh"
+TOKEN="NULLGATE_MARKER_TEST_V1"
+THEME_TOKEN="NULLGATE_SYSTEM_THEME_V1"
+PACKAGE="org.nullprotocol.nullgate"
+RUNTIME="/data/local/tmp/nullgate"
+
+info() {
+  local rendered
+  printf -v rendered '%b' "$1"
+  if [[ -n "${DISPLAY:-}" ]] && command -v zenity >/dev/null; then
+    zenity --info --title="NullGate" --width=470 --text="$rendered"
+  else
+    printf 'NullGate: %s\n' "$rendered"
+  fi
+}
+
+fail() {
+  local rendered
+  printf -v rendered '%b' "$1"
+  if [[ -n "${DISPLAY:-}" ]] && command -v zenity >/dev/null; then
+    zenity --error --title="NullGate stopped safely" --width=520 --text="$rendered"
+  else
+    printf 'NullGate: %s\n' "$rendered" >&2
+  fi
+  return 1
+}
+
+adb_pixi() { adb -s "$SERIAL" "$@"; }
+
+helper_read() {
+  NULLGATE_SERIAL="$SERIAL" "$HELPER" "$@"
+}
+
+helper_write() {
+  NULLGATE_SERIAL="$SERIAL" NULLGATE_MUTATION_TOKEN="$TOKEN" "$HELPER" "$@"
+}
+
+helper_theme() {
+  NULLGATE_SERIAL="$SERIAL" NULLGATE_MUTATION_TOKEN="$THEME_TOKEN" "$HELPER" "$@"
+}
+
+require_connection() {
+  [[ "$(adb_pixi get-state 2>/dev/null)" == device ]] || {
+    fail "PiXi is not available through ADB.\n\nPlug her in, unlock her, and approve USB debugging."
+    return 1
+  }
+}
+
+activate_root() {
+  local output identity context enforcement
+  output="$(adb_pixi root 2>&1)" || {
+    fail "Rooted ADB could not start.\n\nOn PiXi, enable Developer options → Rooted debugging, then try again.\n\n$output"
+    return 1
+  }
+  adb_pixi wait-for-device >/dev/null 2>&1 || {
+    fail "PiXi did not reconnect after starting rooted ADB."
+    return 1
+  }
+  identity="$(adb_pixi shell id 2>/dev/null | tr -d '\r')"
+  context="$(adb_pixi shell id -Z 2>/dev/null | tr -d '\r')"
+  enforcement="$(adb_pixi shell getenforce 2>/dev/null | tr -d '\r')"
+  [[ "$identity" == uid=0\(* && "$context" == u:r:su:s0 && "$enforcement" == Enforcing ]] || {
+    fail "Root verification failed. Nothing was deployed.\n\nIdentity: $identity\nContext: $context\nSELinux: $enforcement"
+    return 1
+  }
+}
+
+runtime_state() {
+  adb_pixi shell "if test -L $RUNTIME; then echo SYMLINK; elif test -d $RUNTIME; then stat -c 'DIR:%u:%a' $RUNTIME; elif test -e $RUNTIME; then echo OTHER; else echo ABSENT; fi" 2>/dev/null | tr -d '\r'
+}
+
+start_session() {
+  require_connection || return 1
+  activate_root || return 1
+
+  local preflight state status_output
+  preflight="$(helper_read preflight 2>&1)" || {
+    fail "NullGate preflight failed. Nothing new was launched.\n\n$preflight"
+    return 1
+  }
+  state="$(runtime_state)"
+  if [[ "$state" == ABSENT ]]; then
+    status_output="$(helper_theme deploy-system-theme 2>&1)" || {
+      fail "The broker did not start. Its evidence was preserved for inspection.\n\n$status_output"
+      return 1
+    }
+  elif status_output="$(helper_read status 2>&1)"; then
+    status_output="The verified broker was already running."
+  else
+    fail "A previous NullGate runtime needs inspection. Do not request a lease.\n\nUse ‘Recover verified stale runtime’ or return to Codex.\n\n$status_output"
+    return 1
+  fi
+
+  adb_pixi shell am start -W -n "$PACKAGE/.MainActivity" >/dev/null 2>&1 || {
+    fail "The broker is running, but the controller screen could not be opened. Stop and clean the session before disconnecting."
+    return 1
+  }
+  adb_pixi shell am start -W -n "com.drdisagree.colorblendr/.ui.activities.MainActivity" >/dev/null 2>&1 || true
+  info "NullGate is ready for ColorBlendr.\n\nIf ColorBlendr Settings says Theming is inactive, turn its service on and approve the request. If it is already active, choose a color, tap Apply, and approve the request.\n\nWhen finished, switch ColorBlendr theming off, then use this launcher again and choose Stop and clean session."
+}
+
+start_colorblendr_session() {
+  start_session
+}
+
+stop_session() {
+  require_connection || return 1
+  activate_root || return 1
+
+  local state output
+  state="$(runtime_state)"
+  if [[ "$state" == ABSENT ]]; then
+    adb_pixi unroot >/dev/null 2>&1 || true
+    info "NullGate was already clean. ADB was returned to non-root.\n\nTurn off Rooted debugging on PiXi if it is still enabled."
+    return
+  fi
+  output="$(helper_write stop 2>&1)" || {
+    fail "NullGate did not confirm a clean stop. No forced kill or cleanup was attempted.\n\nUse Status, then Recover only if the broker has expired or stopped.\n\n$output"
+    return 1
+  }
+  output="$(helper_write cleanup 2>&1)" || {
+    fail "The broker stopped, but cleanup was not confirmed. Evidence was preserved.\n\n$output"
+    return 1
+  }
+  output="$(helper_read verify-clean 2>&1)" || {
+    fail "Final clean-state verification failed.\n\n$output"
+    return 1
+  }
+  adb_pixi unroot >/dev/null 2>&1 || true
+  info "Session closed cleanly.\n\nThe broker stopped, lease markers are absent, the log was archived, the temporary runtime was removed, and ADB returned to non-root.\n\nNow turn off Rooted debugging on PiXi."
+}
+
+show_status() {
+  require_connection || return 1
+  local identity package_path output
+  identity="$(adb_pixi shell id 2>/dev/null | tr -d '\r')"
+  package_path="$(adb_pixi shell pm path "$PACKAGE" 2>/dev/null | tr -d '\r')"
+  if [[ "$identity" == uid=0\(* ]]; then
+    output="$(helper_read status 2>&1)" || true
+  else
+    output="Rooted ADB is not active, so the root runtime is not being inferred."
+  fi
+  info "PiXi connection: yes\nADB identity: $identity\nController installed: $([[ -n "$package_path" ]] && echo yes || echo no)\n\n$output"
+}
+
+recover_runtime() {
+  require_connection || return 1
+  if [[ -n "${DISPLAY:-}" ]] && command -v zenity >/dev/null; then
+    zenity --question --title="NullGate recovery" --width=510 \
+      --text="Use recovery only after the broker stopped or its 15-minute lifetime expired. The helper will refuse unsafe files or a live process. Continue?" || return
+  fi
+  activate_root || return 1
+  local output
+  output="$(helper_theme recover-system-theme-runtime 2>&1)" || {
+    fail "Recovery refused the current state. Evidence remains untouched.\n\n$output"
+    return 1
+  }
+  output="$(helper_read verify-clean 2>&1)" || {
+    fail "Recovery ran, but final verification failed.\n\n$output"
+    return 1
+  }
+  adb_pixi unroot >/dev/null 2>&1 || true
+  info "Verified stale runtime recovered and ADB returned to non-root.\n\nTurn off Rooted debugging on PiXi."
+}
+
+menu() {
+  while true; do
+    local choice
+    choice="$(zenity --list --title="NullGate · PiXi" --width=620 --height=380 \
+      --text="PiXi must be plugged in and unlocked. Enable Rooted debugging before Start, Stop, or Recovery." \
+      --column="Action" --column="What it does" \
+      "Start ColorBlendr NullGate session" "Verify PiXi and launch the temporary theme broker" \
+      "Stop and clean session" "Revoke/stop, archive the log, remove runtime, unroot ADB" \
+      "Show status" "Read connection and verified broker status" \
+      "Recover verified stale runtime" "Guarded cleanup after expiry or an interrupted session" \
+      "Exit" "Close this launcher" 2>/dev/null)" || return
+    case "$choice" in
+      "Start ColorBlendr NullGate session") start_session ;;
+      "Stop and clean session") stop_session ;;
+      "Show status") show_status ;;
+      "Recover verified stale runtime") recover_runtime ;;
+      *) return ;;
+    esac
+  done
+}
+
+case "${1:-menu}" in
+  menu) menu ;;
+  start) start_session ;;
+  colorblendr) start_colorblendr_session ;;
+  stop) stop_session ;;
+  status) show_status ;;
+  recover) recover_runtime ;;
+  *) printf 'Usage: nullgate-pixi {menu|start|colorblendr|stop|status|recover}\n' >&2; exit 2 ;;
+esac
+
