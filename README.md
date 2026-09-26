@@ -57,13 +57,15 @@ denial, process restart, reconciliation and broker-absent behavior on PiXi.
 See `DEPLOYMENT_VERDICT_2026-09-25.md` for the evidence, remaining limits, and
 conditional approval of the supervised first-party external-client theme test.
 That test subsequently stopped safely on theme-triggered Activity recreation:
-the grant was revoked and exact restoration verified. External-client success
-remains blocked pending the lifecycle repair in `DEVICE_TEST_2026-09-25.md`.
+the grant was revoked and exact restoration verified. The lifecycle repair is
+recorded in `DEVICE_TEST_2026-09-25.md`.
 The bounded repair retains one authenticated operation across configuration
 recreation while leaving process-death recovery fail-closed. The reviewed
 rerun passed real grant delivery, immediate revoke, natural expiry, exact theme
 restoration and clean shutdown. See `DEVICE_TEST_PASS_2026-09-25.md` for the
-current first-party test result; third-party compatibility remains unverified.
+current first-party test result. The PiXi private ColorBlendr fork also passed
+grant, immediate revoke, automatic expiry and exact restoration; arbitrary
+third-party compatibility remains unverified.
 
 Outputs:
 - `dist/NullGate-prototype-debug.apk`
@@ -82,13 +84,13 @@ managed release identity and a fresh signer-policy review.
 
 ## Device safety gate
 
-The reviewed marker and native-theme modes have passed supervised PiXi tests;
-external-app compatibility and production use remain blocked.
-The canonical `device/nullgate-device.sh` entry point requires the explicit
-`NULLGATE_MARKER_TEST_V1` mutation token for every device write. Without it,
-install, deploy, stop, cleanup and recovery stop before contacting ADB.
+The reviewed marker and native-theme modes and the pinned private ColorBlendr
+client have passed supervised PiXi tests; production use remains unapproved.
+The canonical `device/nullgate-device-v2.sh` entry point requires the explicit
+mode token for every device write. Without the matching token, install, deploy,
+stop, cleanup and recovery stop before contacting ADB.
 
-`device/nullgate-device.sh preflight` and `status` remain read-only on the
+`device/nullgate-device-v2.sh preflight` and `status` remain read-only on the
 device and pin all ADB calls to one serial. Set `NULLGATE_SERIAL` explicitly
 for every mutation, even with only one device attached. A per-host lock prevents
 overlapping helper operations on the same serial. Preflight requires tokay, Android 16,
@@ -137,10 +139,10 @@ build. A direct ADB-shell spoof attempt on PiXi was denied with no broker
 runtime and ADB remaining non-root. The matching ColorBlendr client patch now
 builds off-device, rejects malformed or ambiguous Activity results, and
 reconciles interrupted grant/revoke operations instead of treating them as
-clean. Its policy unit tests pass and the current patch series is exported under
-`integrations/patches/`; PiXi's official ColorBlendr remains untouched. Live
-ColorBlendr integration awaits upstream adoption under the official signer and
-a new NullGate version-policy review.
+clean. Its policy unit tests pass and the upstream-oriented patch series is
+exported under `integrations/patches/`. On this private branch, PiXi now runs
+the pinned `v3.0.1-nullgate.1` fork and its live lease lifecycle passed.
+Upstream adoption under the official signer remains a separate public path.
 See `CLIENT_INTEGRATION.md` and `TEST_CLIENT.md`.
 
 Protocol v2 and the first native adapter are now implemented off-device. The
