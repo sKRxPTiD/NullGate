@@ -39,13 +39,15 @@ public final class ExternalClientPolicyTest {
         denies(() -> testRequest(repeat('0', 64), CONTROLLER_SIGNER, 1));
         denies(() -> testRequest(CONTROLLER_SIGNER, null, 1));
         denies(() -> testRequest(CONTROLLER_SIGNER, CONTROLLER_SIGNER, 2));
-        denies(() -> ExternalClientPolicy.authorizeClient(1, true, 10258, PACKAGE, 43,
+        denies(() -> ExternalClientPolicy.authorizeClient(1, true, 10258, PACKAGE,
+                ExternalClientPolicy.COLORBLENDR_VERSION_CODE + 1,
                 new String[]{PACKAGE}, new String[]{SIGNER}));
         System.out.println("NullGate external-client policy tests: 26 passed");
     }
 
     private static void revokeIdentityUsesTheSamePin() {
-        ExternalClientPolicy.authorizeClient(1, true, 10258, PACKAGE, 42,
+        ExternalClientPolicy.authorizeClient(1, true, 10258, PACKAGE,
+                ExternalClientPolicy.COLORBLENDR_VERSION_CODE,
                 new String[]{PACKAGE}, new String[]{SIGNER});
     }
 
@@ -102,7 +104,8 @@ public final class ExternalClientPolicyTest {
     private static ExternalClientPolicy.ApprovedThemeRequest request(int version,
             boolean forResult, int uid, String claimed, String[] packages, String[] signers,
             int seed, String style, long duration) {
-        return ExternalClientPolicy.authorizeThemeRequest(version, forResult, uid, claimed, 42,
+        return ExternalClientPolicy.authorizeThemeRequest(version, forResult, uid, claimed,
+                ExternalClientPolicy.COLORBLENDR_VERSION_CODE,
                 packages, signers, seed, style, duration);
     }
 

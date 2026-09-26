@@ -8,8 +8,8 @@ public final class ExternalClientPolicy {
     public static final long MAX_DURATION_MILLIS = 10L * 60L * 1000L;
     public static final String COLORBLENDR_PACKAGE = "com.drdisagree.colorblendr";
     public static final String COLORBLENDR_SIGNER =
-            "4af4ffa12ce90815a1775c4604ea16c19f5bed2a6e09ae7c3c92815982af052e";
-    public static final long COLORBLENDR_VERSION_CODE = 42L;
+            "4ea5f2d0eed34de88c25f33cbf5e0874e234be5614aae48d81a8ded413724f47";
+    public static final long COLORBLENDR_VERSION_CODE = 42001L;
     public static final String TEST_CLIENT_PACKAGE =
             "org.nullprotocol.nullgate.testclient";
     public static final long TEST_CLIENT_VERSION_CODE = 1L;

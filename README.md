@@ -188,6 +188,10 @@ official package is present.
 The upstream ColorBlendr proposal is tracked in
 [Mahmud0808/ColorBlendr#314](https://github.com/Mahmud0808/ColorBlendr/pull/314).
 
+The `pixi-private-colorblendr` branch is a separate personal deployment gate
+for the disposable PiXi fork. It does not alter the official-signer policy on
+`main`; see `PIXI_PRIVATE_COLORBLENDR.md` on that branch.
+
 ## License and identity
 
 The source is licensed under GPL-3.0-only; see `LICENSE`. The NullGate name,
