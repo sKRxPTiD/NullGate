@@ -24,10 +24,14 @@ token cannot install it. See `DEPLOYMENT_GATE.md` before any device use.
    Android/Lineage version, root identity, SELinux Enforcing state, controller
    signer, broker artifact hash, and process identity. It then opens NullGate on
    PiXi.
-5. Choose a basic color in ColorBlendr and tap **Apply**. Review and approve the
-   60-second request in NullGate.
+5. If ColorBlendr Settings says **Theming is inactive**, turn its service on;
+   that requests a lease for the current color. If it is already active, choose
+   a basic color and tap **Apply**. Review and approve the 60-second request in
+   NullGate.
 6. To end early, open ColorBlendr Settings and switch its theming service off.
    The tested path revokes the lease and restores the exact previous theme.
+   If left alone, the lease expires after 60 seconds and restores the theme
+   automatically; this ColorBlendr expiry path passed on PiXi on 2026-09-26.
 7. Open **NullGate · PiXi** on DoloWOLF again and choose
    **Stop and clean session**.
 8. Wait for the clean-session confirmation, then turn **Rooted debugging off**
