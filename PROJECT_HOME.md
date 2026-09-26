@@ -13,3 +13,7 @@ TerraDrive is mounted through NTFS/FUSE and does not enforce private Unix file
 modes. Encrypted signing keystores may be retained with the project, but their
 plaintext password files must remain in DoloWOLF's protected local credential
 directory and be supplied with `NULLGATE_KEYPASS_FILE` when building.
+
+For the paired PiXi build, use `release/build-pixi-private.sh`. It selects the
+canonical TerraDrive source and encrypted keystore while requiring the local
+credential to remain mode `0600`.
