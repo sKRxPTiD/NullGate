@@ -19,6 +19,8 @@ command -v keytool >/dev/null
 command -v zip >/dev/null
 command -v openssl >/dev/null
 
+bash "$BASE_DIR/release/check-release-metadata.sh"
+
 bash "$BASE_DIR/client/test.sh"
 bash "$BASE_DIR/test-client/test.sh"
 bash "$BASE_DIR/broker/test.sh"
@@ -95,6 +97,7 @@ verify_manifest_identity() {
 }
 verify_manifest_identity "$DIST_DIR/NullGate-prototype-debug.apk" org.nullprotocol.nullgate 2
 verify_manifest_identity "$DIST_DIR/NullGate-test-client-debug.apk" org.nullprotocol.nullgate.testclient 1
+bash "$BASE_DIR/release/check-release-metadata.sh" --with-apk
 
 javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/broker-classes" \
   $(find "$BASE_DIR/common/src" "$BASE_DIR/broker/src" "$BASE_DIR/broker/android" -name '*.java' -print)

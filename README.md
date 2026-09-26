@@ -15,7 +15,7 @@ case baked into the broker.
 The controller uses green circuit branding and the ∅ mark over a cappuccino
 palette.
 
-## Current result — 2026-09-24
+## Current result — 2026-09-26
 
 The signed controller and separate Android broker build locally. The marker
 lease and native 60-second theme lease have both passed supervised PiXi tests,
@@ -35,6 +35,9 @@ Lost replies, restart and unknown broker records are not presented as no root.
 
 The local log is bounded to 16 KiB; it is not a tamper-proof audit ledger.
 A marker is a lifecycle test, not proof of reversible privilege in other apps.
+
+The current PiXi controller is NullGate 0.1.0 (version code 2). See `STATUS.md`
+for the concise completed-versus-remaining product boundary.
 
 ## Build and tests
 

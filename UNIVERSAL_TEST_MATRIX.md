@@ -20,13 +20,15 @@ privilege.
 | Adapter registry | Duplicate package-capability registration is rejected | Broker registry tests passed |
 | Concurrent capacity | New grants stop at the active-lease policy ceiling | One-active-lease policy test passed |
 | Request rate | New requests stop at the per-client elapsed-time ceiling | Persistent-window policy tests passed |
-| External app | Officially signed client build on PiXi | Pending upstream ColorBlendr adoption |
+| External app, private path | Signer-pinned client build on PiXi | Passed with the matched private ColorBlendr fork |
+| External app, public path | Official upstream signer and reviewed release | Optional; pending upstream ColorBlendr adoption |
 
 ## Adding a new client
 
 For each new client, record the package, version, signer, capability, maximum
-lease, exact restoration proof, and supervised-device run. Do not mark the
-external-app row complete using a debug-signed APK or host-only build.
+lease, exact restoration proof, and supervised-device run. A private matched
+build can complete the private row but cannot be presented as an official
+upstream release.
 
 ## Model and deployment gates
 
