@@ -130,7 +130,7 @@ public final class MainActivity extends Activity {
         });
         page.addView(nativeTheme, marginParams(-1, dp(52), 0, dp(8)));
 
-        Button request = quietButton("ColorBlendr client integration — awaiting client patch");
+        Button request = quietButton("ColorBlendr client integration — verified on PiXi");
         request.setEnabled(false);
         page.addView(request, marginParams(-1, dp(52), 0, dp(8)));
 
