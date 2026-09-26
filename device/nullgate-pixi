@@ -7,7 +7,11 @@ HELPER="$PROJECT/device/nullgate-device-v2.sh"
 TOKEN="NULLGATE_MARKER_TEST_V1"
 THEME_TOKEN="NULLGATE_SYSTEM_THEME_V1"
 PACKAGE="org.nullprotocol.nullgate"
+COLORBLENDR_PACKAGE="com.drdisagree.colorblendr"
 RUNTIME="/data/local/tmp/nullgate"
+APKSIGNER="/home/wolf/Android/Sdk/build-tools/36.0.0/apksigner"
+CONTROLLER_SIGNER="fc122f22e4716ba03cae81893783e437553d4a3ad21e897f4efe3367c415bafe"
+COLORBLENDR_SIGNER="4ea5f2d0eed34de88c25f33cbf5e0874e234be5614aae48d81a8ded413724f47"
 
 info() {
   local rendered
@@ -148,6 +152,74 @@ show_status() {
   info "PiXi connection: yes\nADB identity: $identity\nController installed: $([[ -n "$package_path" ]] && echo yes || echo no)\n\n$output"
 }
 
+installed_apk_path() {
+  local package_name="$1" output path count
+  output="$(adb_pixi shell pm path "$package_name" 2>/dev/null | tr -d '\r')" || return 1
+  count="$(printf '%s\n' "$output" | sed -n 's/^package://p' | wc -l | tr -d '[:space:]')"
+  [[ "$count" == 1 ]] || return 1
+  path="$(printf '%s\n' "$output" | sed -n 's/^package://p')"
+  [[ "$path" == /data/app/*/base.apk ]] || return 1
+  printf '%s\n' "$path"
+}
+
+installed_signer() {
+  local package_name="$1" temp_dir apk_path digest
+  apk_path="$(installed_apk_path "$package_name")" || return 1
+  temp_dir="$(mktemp -d)"
+  adb_pixi pull "$apk_path" "$temp_dir/base.apk" >/dev/null 2>&1 || {
+    rm -rf -- "$temp_dir"
+    return 1
+  }
+  digest="$("$APKSIGNER" verify --print-certs "$temp_dir/base.apk" 2>/dev/null \
+    | sed -n 's/^Signer #[0-9][0-9]* certificate SHA-256 digest: //p')"
+  rm -rf -- "$temp_dir"
+  [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || return 1
+  printf '%s\n' "$digest"
+}
+
+health_check() {
+  require_connection || return 1
+  [[ -x "$APKSIGNER" ]] || {
+    fail "Android APK signature verification is unavailable on DoloWOLF."
+    return 1
+  }
+
+  local identity controller_signer colorblendr_signer controller_version colorblendr_version runtime
+  identity="$(adb_pixi shell id 2>/dev/null | tr -d '\r')"
+  [[ "$identity" == uid=2000\(* ]] || {
+    fail "PiXi is connected, but ADB is not in its normal non-root state. Close the active session first.\n\n$identity"
+    return 1
+  }
+  controller_signer="$(installed_signer "$PACKAGE")" || {
+    fail "The installed NullGate controller identity could not be verified."
+    return 1
+  }
+  colorblendr_signer="$(installed_signer "$COLORBLENDR_PACKAGE")" || {
+    fail "The installed ColorBlendr fork identity could not be verified."
+    return 1
+  }
+  [[ "$controller_signer" == "$CONTROLLER_SIGNER" ]] || {
+    fail "The installed NullGate controller signer does not match the paired PiXi build."
+    return 1
+  }
+  [[ "$colorblendr_signer" == "$COLORBLENDR_SIGNER" ]] || {
+    fail "The installed ColorBlendr signer does not match the admitted private fork."
+    return 1
+  }
+  controller_version="$(adb_pixi shell dumpsys package "$PACKAGE" 2>/dev/null | sed -n 's/^[[:space:]]*versionCode=\([0-9]*\).*/\1/p' | head -1 | tr -d '\r')"
+  colorblendr_version="$(adb_pixi shell dumpsys package "$COLORBLENDR_PACKAGE" 2>/dev/null | sed -n 's/^[[:space:]]*versionCode=\([0-9]*\).*/\1/p' | head -1 | tr -d '\r')"
+  [[ "$controller_version" == 1 && "$colorblendr_version" == 42001 ]] || {
+    fail "Installed version pins do not match the verified pair.\n\nController: $controller_version\nColorBlendr: $colorblendr_version"
+    return 1
+  }
+  runtime="$(runtime_state)"
+  [[ "$runtime" == ABSENT ]] || {
+    fail "A NullGate runtime still exists: $runtime\n\nUse Status and the guarded Stop or Recovery action."
+    return 1
+  }
+  info "PiXi NullGate health check passed.\n\nADB: ordinary shell\nController: version 1, paired signer verified\nColorBlendr: version 42001, admitted signer verified\nRuntime: absent\nDevice writes performed: none"
+}
+
 recover_runtime() {
   require_connection || return 1
   if [[ -n "${DISPLAY:-}" ]] && command -v zenity >/dev/null; then
@@ -182,12 +254,14 @@ menu() {
       "Start ColorBlendr NullGate session" "Verify PiXi and launch the temporary theme broker" \
       "Stop and clean session" "Revoke/stop, archive the log, remove runtime, unroot ADB" \
       "Show status" "Read connection and verified broker status" \
+      "Run read-only health check" "Verify installed identities and clean idle state" \
       "Recover verified stale runtime" "Guarded cleanup after expiry or an interrupted session" \
       "Exit" "Close this launcher" 2>/dev/null)" || return
     case "$choice" in
       "Start ColorBlendr NullGate session") start_session ;;
       "Stop and clean session") stop_session ;;
       "Show status") show_status ;;
+      "Run read-only health check") health_check ;;
       "Recover verified stale runtime") recover_runtime ;;
       *) return ;;
     esac
@@ -200,6 +274,7 @@ case "${1:-menu}" in
   colorblendr) start_colorblendr_session ;;
   stop) stop_session ;;
   status) show_status ;;
+  doctor) health_check ;;
   recover) recover_runtime ;;
-  *) printf 'Usage: nullgate-pixi {menu|start|colorblendr|stop|status|recover}\n' >&2; exit 2 ;;
+  *) printf 'Usage: nullgate-pixi {menu|start|colorblendr|stop|status|doctor|recover}\n' >&2; exit 2 ;;
 esac

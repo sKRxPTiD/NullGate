@@ -60,6 +60,7 @@ The same controls are available in a DoloWOLF terminal:
 
 ```bash
 nullgate-pixi status
+nullgate-pixi doctor
 nullgate-pixi start
 nullgate-pixi colorblendr
 nullgate-pixi stop
@@ -69,6 +70,10 @@ nullgate-pixi recover
 The desktop launcher and command both use the same guarded implementation.
 Its tracked source is `device/nullgate-pixi`. Reinstall or repair the DoloWOLF
 launcher with `device/install-dolowolf-launcher.sh`.
+
+**Run read-only health check** (or `nullgate-pixi doctor`) verifies ordinary
+ADB, the installed package versions and signing certificates, and an absent
+runtime. It does not enable root or write to PiXi.
 
 ## ColorBlendr integration
 
