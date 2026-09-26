@@ -168,10 +168,9 @@ PiXi before Start, Stop, or Recovery. A clean Stop archives the broker log,
 verifies zero leases, removes the managed runtime, returns ADB to non-root, and
 reminds the operator to disable Rooted debugging on the phone.
 
-See `OPERATOR_GUIDE.md` for the ordinary workflow. The ColorBlendr/Shizuku
-candidate has not been deployed on PiXi. Its dedicated launcher action is
-fail-closed until the modified-manager conflict is resolved and the pinned
-official package is present.
+See `OPERATOR_GUIDE.md` for the ordinary workflow. On the PiXi private branch,
+the pinned ColorBlendr fork's typed system-theme grant and explicit revoke path
+passed on-device. This path does not require Shizuku.
 
 ## Integration and review
 

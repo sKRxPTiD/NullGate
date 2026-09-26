@@ -20,7 +20,7 @@ The controller must be built with PiXi's existing paired NullGate signing
 identity. The client pins that controller certificate; a controller signed by a
 different local development key is rejected.
 
-Deployment remains gated on the final privileged review. The supervised run is
-limited to one 60-second native theme lease, immediate revoke, exact restoration,
-broker shutdown, runtime cleanup, return to non-root ADB, and disabling Rooted
-debugging. Stop on any `UNKNOWN` or cleanup failure.
+The final privileged review and supervised PiXi run passed on 2026-09-25. One
+60-second native theme lease was granted and explicitly revoked, the exact prior
+theme was restored, the broker stopped, the runtime was removed, and ADB returned
+to non-root. See the deployment bundle's `LIVE_TEST_PASS.md` for the evidence.
