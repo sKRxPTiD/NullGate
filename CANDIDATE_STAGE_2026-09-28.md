@@ -48,8 +48,9 @@ Rooted debugging was switched off after the completed device gate. The final
 verified shutdown state was ordinary non-root ADB, enforcing SELinux, no active
 lease and no managed broker runtime.
 
-## Promotion gate
+## Subsequent promotion
 
-No promotion, Git push or public release has occurred. Copying this candidate
-into the authoritative `releases/` directory requires separate explicit
-authorization.
+After this staging audit, explicit continuation authorization was given and the
+ZIP plus checksum sidecar were copied byte-for-byte into the authoritative
+`releases/` directory. See `RELEASE_PROMOTION_2026-09-28.md`. No Git push or
+public release occurred.
