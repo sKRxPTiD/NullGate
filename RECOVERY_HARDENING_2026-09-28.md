@@ -7,8 +7,8 @@ preserved. Exact theme restoration still precedes archival, so this failure
 can leave a restored theme with a retained receipt; it does not prove runtime
 cleanup and the operator must inspect or retry recovery.
 
-A simulated copy-corruption regression confirms that archive corruption is
-rejected and the runtime and theme receipt remain present. The existing
+A simulated archive-write failure and a copy-corruption regression confirm
+that both failures are rejected and the runtime and theme receipt remain present. The existing
 successful VALUE and NULL restoration scenarios continue to pass.
 
 Validation: shell syntax, the full simulated v2 device-helper suite, launcher

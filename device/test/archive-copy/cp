@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-/usr/bin/cp "$@"
 destination="${!#}"
+if [[ "${NULLGATE_TEST_FAIL_ARCHIVE:-}" == 1 && "$destination" == */theme-recovery-*.snapshot ]]; then
+  exit 1
+fi
+/usr/bin/cp "$@"
 if [[ "${NULLGATE_TEST_CORRUPT_ARCHIVE:-}" == 1 && "$destination" == */theme-recovery-*.snapshot ]]; then
   printf 'simulated archive corruption\n' > "$destination"
 fi
