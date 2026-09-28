@@ -309,6 +309,12 @@ expect_failure proc-fail recover-marker-runtime "UNKNOWN"
 [[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0 theme_snapshot=0 theme_client=0" ]]
 
 set_state 1 1 1 0 0 0 0 0 1
+if output="$(PATH="$BASE_DIR/device/test/archive-copy:$PATH" NULLGATE_TEST_CORRUPT_ARCHIVE=1 run_theme_helper theme-recovery recover-system-theme-runtime 2>&1)"; then
+  echo "corrupted theme recovery archive was accepted" >&2; exit 1
+fi
+[[ "$output" == *"archive failed hash verification"* ]]
+[[ "$(cat "$STATE")" == *"runtime=1"*"theme_snapshot=1"* ]]
+set_state 1 1 1 0 0 0 0 0 1
 run_theme_helper theme-recovery recover-system-theme-runtime >/dev/null
 run_theme_helper ready verify-clean >/dev/null
 set_state 1 1 1 0 0 0 0 0 1

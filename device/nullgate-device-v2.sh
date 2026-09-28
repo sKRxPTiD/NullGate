@@ -506,7 +506,7 @@ recover_system_theme_runtime() {
   platform_preflight
   require_private_runtime
   require_no_broker
-  local pid receipt_state temp_dir receipt kind snapshot current entries entry
+  local pid receipt_state temp_dir receipt kind snapshot current entries entry archived_receipt receipt_hash
   pid="$(validated_stale_pid_receipt)"
   receipt_state="$(adb_device shell "if test -L $DEVICE_DIR/theme.snapshot; then echo SYMLINK; elif test -f $DEVICE_DIR/theme.snapshot; then stat -c 'FILE:%u:%a:%s' $DEVICE_DIR/theme.snapshot; elif test -e $DEVICE_DIR/theme.snapshot; then echo OTHER; else echo ABSENT; fi" | tr -d '\r')"
   [[ "$receipt_state" =~ ^FILE:0:600:([0-9]{1,5})$ ]] || die "theme recovery receipt is absent or unsafe: $receipt_state"
@@ -539,7 +539,12 @@ recover_system_theme_runtime() {
     rm -rf -- "$temp_dir"; die "theme recovery receipt format is invalid"
   fi
   mkdir -p "$LOG_DIR"
-  cp -- "$receipt" "$LOG_DIR/theme-recovery-$SERIAL-$(date -u +%Y%m%dT%H%M%SZ).snapshot"
+  receipt_hash="$(sha256sum "$receipt" | awk '{print $1}')"
+  archived_receipt="$LOG_DIR/theme-recovery-$SERIAL-$(date -u +%Y%m%dT%H%M%SZ).snapshot"
+  cp -- "$receipt" "$archived_receipt" \
+    || { rm -rf -- "$temp_dir"; die "theme recovery archive could not be written; device receipt preserved"; }
+  [[ "$(sha256sum "$archived_receipt" | awk '{print $1}')" == "$receipt_hash" ]] \
+    || { rm -rf -- "$temp_dir"; die "theme recovery archive failed hash verification; device receipt preserved"; }
   rm -rf -- "$temp_dir"
   adb_device shell "rm -f $DEVICE_DIR/theme.snapshot" >/dev/null || die "could not remove verified theme recovery receipt"
   remove_validated_stale_pid_receipt "$pid"
