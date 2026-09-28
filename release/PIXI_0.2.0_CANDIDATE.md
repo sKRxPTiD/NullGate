@@ -5,6 +5,11 @@ baseline and not a public release. It contains the exact reproducible NullGate
 controller, first-party Theme Client and broker byte identities that passed the
 2026-09-28 supervised PiXi gate.
 
+This candidate was audited and promoted byte-for-byte to the authoritative
+`releases/` directory. The promotion record and checksums are in
+`../RELEASE_PROMOTION_RC2_2026-09-28.md`; this file describes the candidate's
+scope and original staging boundary.
+
 ## Scope
 
 - NullGate controller 0.2.0, version code 3

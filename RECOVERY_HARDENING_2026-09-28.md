@@ -90,3 +90,15 @@ debugging toggle off separately. Wolf subsequently confirmed it was off.
 This validates live broker-log hashing and cleanup. Theme snapshot transfer,
 archival and concurrent-change failure paths remain covered by simulation;
 their live recovery gate remains pending.
+
+## Subsequent launcher validation and desktop integration
+
+After the Start/Stop failure-path changes above, the simulated launcher suite
+was extended to exercise those paths and the installer in an isolated temporary
+home. Nineteen launcher regressions and the full simulated device-helper suite
+pass. The DoloWOLF installer now creates executable entries both on the desktop
+and in `All Appz`; both entries validate and invoke the same installed launcher.
+The active-source installer was applied on DoloWOLF, and its launcher matches
+tracked source. This host-only desktop change does not alter the promoted RC2
+bundle or any Android artifact. Theme-receipt recovery still has no live
+interrupted-session rehearsal.

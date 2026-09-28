@@ -14,22 +14,39 @@ fail() { printf '%b\n' "$1" >&2; return 1; }
 info() { printf 'SUCCESS: %b\n' "$1"; }
 require_connection() { return 0; }
 activate_root() { return 0; }
-runtime_state() { printf 'ABSENT\n'; }
+runtime_state() {
+  case "$scenario" in
+    stop-write-fails|cleanup-fails|stop-verify-fails) printf 'DIR:0:700\n' ;;
+    *) printf 'ABSENT\n' ;;
+  esac
+}
 helper_read() {
   case "$*" in
-    preflight) return 0 ;;
+    preflight)
+      [[ "$scenario" != start-preflight-fails ]] || { printf 'preflight refused\n'; return 1; } ;;
     verify-clean)
-      [[ "$scenario" != broker-present && "$scenario" != recovery-verification-failed ]] || { printf 'broker still running\n'; return 1; } ;;
+      [[ "$scenario" != broker-present && "$scenario" != recovery-verification-failed \
+        && "$scenario" != stop-verify-fails ]] || { printf 'clean verification refused\n'; return 1; } ;;
     *) return 64 ;;
   esac
 }
 helper_theme() {
   [[ "$*" == deploy-system-theme ]] || return 64
   printf 'deploy-system-theme\n' >> "$test_log"
+  [[ "$scenario" != start-deploy-fails ]] || { printf 'deploy evidence retained\n'; return 1; }
+}
+helper_write() {
+  case "$*" in
+    stop)
+      [[ "$scenario" != stop-write-fails ]] || { printf 'stop refused\n'; return 1; } ;;
+    cleanup)
+      [[ "$scenario" != cleanup-fails ]] || { printf 'cleanup refused\n'; return 1; } ;;
+    *) return 64 ;;
+  esac
 }
 adb_pixi() {
   case "$*" in
-    unroot) [[ "$scenario" != unroot-fails ]] ;;
+    unroot) printf 'unroot\n' >> "$test_log"; [[ "$scenario" != unroot-fails ]] ;;
     'shell id')
       case "$scenario" in
         still-root) printf 'uid=0(root)\n' ;;
@@ -37,9 +54,11 @@ adb_pixi() {
         *) printf 'uid=2000(shell)\n' ;;
       esac ;;
     'shell am start -W -n org.nullprotocol.nullgate/.MainActivity')
-      printf 'controller\n' >> "$test_log" ;;
+      printf 'controller\n' >> "$test_log"
+      [[ "$scenario" != start-controller-fails ]] ;;
     'shell am start -W -n org.nullprotocol.nullgate.themeclient/.MainActivity')
-      printf 'theme-client\n' >> "$test_log" ;;
+      printf 'theme-client\n' >> "$test_log"
+      [[ "$scenario" != start-client-fails ]] ;;
     'shell am start -W -n com.drdisagree.colorblendr/.ui.activities.MainActivity')
       printf 'colorblendr\n' >> "$test_log" ;;
     *) printf 'unexpected simulated ADB call: %s\n' "$*" >&2; return 64 ;;
@@ -60,6 +79,28 @@ done
 scenario=ready
 output="$(stop_session 2>&1)"
 [[ "$output" == *'SUCCESS: NullGate was already clean.'* ]] || exit 1
+
+for scenario in start-preflight-fails start-deploy-fails start-controller-fails start-client-fails; do
+  : > "$test_log"
+  if output="$(start_theme_client_session 2>&1)"; then
+    printf 'Launcher falsely accepted %s\n' "$scenario" >&2; exit 1
+  fi
+  [[ "$output" != *SUCCESS:* ]]
+  [[ "$(tail -n 1 "$test_log")" == unroot ]] || {
+    printf 'Launcher did not return ADB to shell after %s\n' "$scenario" >&2; exit 1;
+  }
+done
+
+for scenario in stop-write-fails cleanup-fails stop-verify-fails; do
+  : > "$test_log"
+  if output="$(stop_session 2>&1)"; then
+    printf 'Launcher falsely accepted %s\n' "$scenario" >&2; exit 1
+  fi
+  [[ "$output" != *SUCCESS:* ]]
+  [[ "$(tail -n 1 "$test_log")" == unroot ]] || {
+    printf 'Launcher did not return ADB to shell after %s\n' "$scenario" >&2; exit 1;
+  }
+done
 
 scenario=start-theme
 : > "$test_log"
@@ -123,4 +164,4 @@ cmp -s "$test_home/app-folder/NullGate PiXi.desktop" \
 desktop-file-validate "$test_home/app-folder/NullGate PiXi.desktop" \
   "$test_home/Desktop/NullGate PiXi.desktop"
 
-printf 'NullGate launcher regressions: 12 passed (simulated ADB and isolated installer)\n'
+printf 'NullGate launcher regressions: 19 passed (simulated ADB and isolated installer)\n'

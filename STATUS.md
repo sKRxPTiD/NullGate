@@ -8,7 +8,7 @@ system-theme capability has passed real grant, explicit revoke, automatic
 the private ColorBlendr fork. The controller and client identities are pinned.
 The ordinary idle state is non-root ADB with no broker runtime.
 
-## Active source: 0.2.0 PiXi-validated candidate
+## Active source: 0.2.0 PiXi-validated private RC2
 
 The active source has advanced to version code 3 for the second first-party
 typed client. This does not replace or revise the immutable 0.1.0 release
@@ -18,9 +18,11 @@ theme-client artifacts also passed their supervised PiXi installation,
 grant, explicit-revoke, natural-expiry, exact-restoration, reconciliation and
 shutdown gate on 2026-09-28.
 
-See `DEPLOYMENT_REVIEW_2026-09-28.md` for the remediation review and
-`DEVICE_TEST_PASS_2026-09-28.md` for the resulting live evidence. This is a
-validated development candidate, not a new release promotion.
+See `DEPLOYMENT_REVIEW_2026-09-28.md` for the remediation review,
+`DEVICE_TEST_PASS_2026-09-28.md` for the resulting live evidence, and
+`RELEASE_PROMOTION_RC2_2026-09-28.md` for the audited private RC2 promotion.
+The 0.1.0 ZIP remains the immutable baseline; RC2 is a private candidate, not a
+public release.
 
 ColorBlendr is the first client, not NullGate's architecture. New clients use
 the same broker contract, identity checks, lease rules and audit decisions, but
@@ -33,18 +35,18 @@ each new capability still needs a narrow adapter and its own restoration test.
 - Astra is not required for routine builds, documentation or normal operation.
 - No permanent app-callable `su` is installed.
 
-## Remaining product work
+## Remaining non-blocking work
 
-1. Stabilization: use the current matched build and preserve any failure logs.
-2. Release engineering: replace the local development signing identity with a
-   deliberately managed release identity before public distribution.
-3. Resilience: power loss, kernel failure or a forcibly killed broker can delay
-   cleanup; the guarded host recovery path remains part of the safety model.
-4. Generalization: the second first-party typed client now passes both its host
-   and PiXi device gates. NullGate never grants a generic shell just because one
-   client passed.
-5. Public product work: installer, user-facing onboarding, release support and
-   broader device/ROM testing are separate from the working PiXi deployment.
+The supervised private PiXi workflow is complete for normal use. One optional
+recovery validation remains: exercise theme-receipt recovery after a genuinely
+interrupted session. Its failure handling is simulated, but no stale receipt or
+live broker should be manufactured merely to force that test.
+
+Public distribution is a separate project: it needs a deliberately managed
+release signing identity, a fresh signer-policy review, broader device/ROM
+coverage, and any desired official-signer ColorBlendr adoption. None blocks the
+private PiXi workflow. Power loss, kernel failure, or a forcibly killed broker
+can delay cleanup; preserve evidence and use guarded host recovery.
 
 ## Optional public path
 
@@ -71,7 +73,8 @@ helper, updated beginner guidance, and the same PiXi-validated Android
 artifacts. See `RELEASE_PROMOTION_RC2_2026-09-28.md`.
 
 The DoloWOLF launcher was refreshed from tracked source after the 0.2.0 live
-pass. Its read-only doctor verifies the installed controller code 3, theme
+pass and again for the final Start/Stop failure paths. Its read-only doctor
+verifies the installed controller code 3, theme
 client code 1, admitted ColorBlendr code 42001, all expected signers, ordinary
 ADB and an absent managed runtime. Separate launcher actions now open either
 ColorBlendr or the first-party Theme Client through the typed system-theme
@@ -83,13 +86,14 @@ and natural expiry displays specific reconciliation guidance without treating
 elapsed local time as cleanup proof. Exact restoration, reconciliation and
 final zero-runtime shutdown passed again.
 
-The paired build is now byte-reproducible across consecutive clean signed host
+The paired build is byte-reproducible across consecutive clean signed host
 builds; see `REPRODUCIBLE_BUILD_2026-09-28.md`. The exact deterministic
-controller, theme-client and broker artifacts subsequently passed their own
-supervised PiXi grant/revoke/expiry/restoration gate. They are eligible for a
-separately reviewed 0.2.0 candidate bundle. The resulting RC1 bundle was staged
-and audited successfully; see `CANDIDATE_STAGE_2026-09-28.md`. Its ZIP and
-checksum sidecar were then copied byte-for-byte into the authoritative
-`releases/` directory without modifying the verified 0.1.0 baseline; see
-`RELEASE_PROMOTION_2026-09-28.md`. RC1 remains a private release candidate, not
-a final public release.
+controller, theme-client and broker artifacts passed their supervised PiXi
+grant/revoke/expiry/restoration gate. RC1 was staged, audited and promoted as a
+private candidate; see `CANDIDATE_STAGE_2026-09-28.md` and
+`RELEASE_PROMOTION_2026-09-28.md`. RC2 subsequently added the hardened helper
+and updated operator guidance, was audited, and was promoted without changing
+the PiXi-validated Android artifacts; see
+`RELEASE_PROMOTION_RC2_2026-09-28.md`. Both are private candidates, not public
+releases. The verified 0.1.0 baseline remains unchanged. A later DoloWOLF-only
+desktop-shortcut improvement is in the active source and is not part of RC2.

@@ -42,6 +42,13 @@ first-party theme client after their supervised device gate passed. See
 `STATUS.md` and `DEVICE_TEST_PASS_2026-09-28.md` for the boundary between the
 release baseline and validated development state.
 
+The private 0.2.0 RC2 bundle was subsequently audited and promoted under
+`releases/`; it updates the host recovery helper and operator guidance while
+retaining the exact PiXi-validated Android artifact hashes. It is not a public
+release, and the immutable 0.1.0 baseline remains unchanged. See
+`RELEASE_PROMOTION_RC2_2026-09-28.md`. A later DoloWOLF desktop-shortcut fix is
+in active source but was not retroactively added to the immutable RC2 bundle.
+
 ## Build and tests
 
 Install JDK 17 and Android SDK Platform 36 with Build Tools 36.0.0, set
