@@ -203,16 +203,25 @@ case "$request" in
     elif [[ "$leases" == 1 ]]; then echo /data/local/tmp/nullgate/leases/test.lease
     else echo ABSENT; fi ;;
   "shell if test -L /data/local/tmp/nullgate/leases; then echo SYMLINK; elif test -d /data/local/tmp/nullgate/leases; then find /data/local/tmp/nullgate/leases -mindepth 1 -maxdepth 1 -printf '%f:%y\\n'; elif test -e /data/local/tmp/nullgate/leases; then echo OTHER; else echo ABSENT; fi")
-    if [[ "$scenario" == marker-symlink ]]; then echo SYMLINK
+    if [[ "$scenario" == marker-symlink || "$scenario" == theme-recovery-lease-symlink ]]; then echo SYMLINK
     elif [[ "$leases" == 1 ]]; then echo lease_0000000001.lease:f
     else echo ABSENT; fi ;;
   "shell stat -c 'FILE:%u:%a' /data/local/tmp/nullgate/leases/lease_0000000001.lease")
     [[ "$scenario" != marker-unsafe ]] && echo FILE:0:600 || echo FILE:2000:777 ;;
   "shell cat /data/local/tmp/nullgate/leases/lease_0000000001.lease")
-    if [[ "$scenario" == marker-invalid ]]; then echo invalid-marker
+    if [[ "$scenario" == marker-invalid || "$scenario" == theme-recovery-marker-invalid ]]; then echo invalid-marker
     else printf 'lease=lease_0000000001\nexpiresElapsed=999999\n'; fi ;;
   "shell rm -f /data/local/tmp/nullgate/leases/lease_0000000001.lease")
     leases=0; save ;;
+  "shell stat -c 'FILE:%u:%a:%s' /data/local/tmp/nullgate/leases/lease_0000000001.lease")
+    [[ "$scenario" != theme-recovery-marker-unsafe ]] && echo FILE:0:600:44 || echo FILE:2000:777:44 ;;
+  "shell sha256sum /data/local/tmp/nullgate/leases/lease_0000000001.lease")
+    if [[ "$scenario" == theme-recovery-marker-changed && -f "$state_file.marker-hashed" ]]; then
+      printf 'changed marker\n' | sha256sum
+    else
+      printf 'lease=lease_0000000001\nexpiresElapsed=999999\n' | sha256sum
+    fi
+    if [[ "$scenario" == theme-recovery-marker-changed ]]; then touch "$state_file.marker-hashed"; fi ;;
   "shell sha256sum /data/local/tmp/nullgate/theme.snapshot")
     [[ "$scenario" != theme-hash-command-fail ]] || exit 1
     if [[ "$scenario" == theme-hash-empty ]]; then exit 0; fi
@@ -250,7 +259,7 @@ case "$request" in
     if [[ "$scenario" == theme-recovery-broker-appeared ]]; then
       running=1; save; exit 0
     fi
-    [[ ("$scenario" == theme-recovery || "$scenario" == theme-recovery-readback-fail || "$scenario" == theme-recovery-receipt-changed) && "$theme_snapshot" == 1 ]] ;;
+    [[ ("$scenario" == theme-recovery || "$scenario" == theme-recovery-readback-fail || "$scenario" == theme-recovery-receipt-changed || "$scenario" == theme-recovery-marker-changed || "$scenario" == theme-recovery-with-lease) && "$theme_snapshot" == 1 ]] ;;
   "shell cmd settings delete secure theme_customization_overlay_packages")
     [[ "$scenario" == theme-recovery-null && "$theme_snapshot" == 1 ]] ;;
   "shell settings get secure theme_customization_overlay_packages")

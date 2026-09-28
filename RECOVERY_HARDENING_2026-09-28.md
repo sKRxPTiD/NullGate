@@ -102,3 +102,21 @@ The active-source installer was applied on DoloWOLF, and its launcher matches
 tracked source. This host-only desktop change does not alter the promoted RC2
 bundle or any Android artifact. Theme-receipt recovery still has no live
 interrupted-session rehearsal.
+
+## Interrupted theme lease-marker recovery correction
+
+Review found that the theme recovery action required an empty lease directory.
+If the root broker had been interrupted during an active theme lease, its
+validated marker could remain beside the theme snapshot and block the only
+operator recovery route. Active source now inventories and validates the
+single marker allowed by the broker's one-active-lease policy, verifies its
+hash, restores and archives the exact prior theme, rechecks broker absence and
+marker identity, then removes the marker and receipt before verified cleanup.
+Malformed, unsafe, changed, or multiple markers fail closed with recovery
+evidence retained.
+
+Simulated regressions cover successful interrupted recovery with a stale PID,
+malformed/unsafe markers, a symlinked lease directory, and marker changes before
+removal. Live validation is still pending; this fix is not included in the
+immutable RC2 bundle. Do not interrupt a live PiXi broker outside a planned,
+supervised test window.

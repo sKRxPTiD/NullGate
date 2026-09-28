@@ -37,10 +37,12 @@ each new capability still needs a narrow adapter and its own restoration test.
 
 ## Remaining non-blocking work
 
-The supervised private PiXi workflow is complete for normal use. One optional
-recovery validation remains: exercise theme-receipt recovery after a genuinely
-interrupted session. Its failure handling is simulated, but no stale receipt or
-live broker should be manufactured merely to force that test.
+The supervised private PiXi workflow is complete for normal use. Active source
+now also handles an interrupted theme session that leaves its validated lease
+marker behind; the previously promoted RC2 helper refused that state. The new
+path has simulated coverage, but still needs one supervised live recovery
+rehearsal. Do not manufacture a stale receipt or interrupt a broker except
+during that planned test window.
 
 Public distribution is a separate project: it needs a deliberately managed
 release signing identity, a fresh signer-policy review, broader device/ROM
@@ -71,6 +73,9 @@ Theme-receipt recovery validation remains simulated. These follow-up changes
 were excluded from RC1. RC2 is now packaged and promoted with the hardened
 helper, updated beginner guidance, and the same PiXi-validated Android
 artifacts. See `RELEASE_PROMOTION_RC2_2026-09-28.md`.
+Since RC2 promotion, active source has gained a further recovery fix for
+validated lease markers left by an interrupted broker. It is host-simulated but
+not yet in the immutable RC2 bundle; its live rehearsal is pending.
 
 The DoloWOLF launcher was refreshed from tracked source after the 0.2.0 live
 pass and again for the final Start/Stop failure paths. Its read-only doctor

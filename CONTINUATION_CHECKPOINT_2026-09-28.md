@@ -32,10 +32,13 @@ cleanup, unchanged-theme verification and the final read-only doctor on PiXi.
 ADB returned to ordinary shell. Wolf confirmed Rooted debugging is off.
 No device operation is in progress.
 
-Theme-receipt recovery itself still needs live validation. Do not count the
-no-lease broker check as proof of that path. Do not manufacture a stale theme
-receipt, kill a live broker, or clear controller records merely to force a test.
-Plan the supervised gate before changing device state.
+Theme-receipt recovery has extensive simulated failure coverage. A Sol review
+found that the prior helper refused a valid leftover lease marker after broker
+interruption; active source now validates, archives/restores, and removes that
+marker under the receipt and broker-absence checks. The new branch still needs
+one supervised live recovery rehearsal. Do not count the no-lease broker check
+as proof. Do not manufacture a stale theme receipt or interrupt a broker
+outside that planned test window.
 
 The preserved 0.2.0 RC1 ZIP and checksum still verify. Its helper predates this
 hardening. RC2 contains the hardened helper and updated beginner guide and was

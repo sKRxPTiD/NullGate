@@ -48,6 +48,9 @@ retaining the exact PiXi-validated Android artifact hashes. It is not a public
 release, and the immutable 0.1.0 baseline remains unchanged. See
 `RELEASE_PROMOTION_RC2_2026-09-28.md`. A later DoloWOLF desktop-shortcut fix is
 in active source but was not retroactively added to the immutable RC2 bundle.
+Active source also fixes theme recovery when an interrupted broker leaves a
+validated lease marker; this has simulated coverage and awaits supervised live
+recovery validation before a future candidate bundle.
 
 ## Build and tests
 
