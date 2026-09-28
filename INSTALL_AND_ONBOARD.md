@@ -47,27 +47,27 @@ Leave Rooted debugging off. Run:
 nullgate-pixi doctor
 ```
 
-This checks the connected device identity, installed controller and ColorBlendr
-signers and versions, ordinary non-root ADB, and absence of the managed broker
-runtime. It performs no device writes. A healthy result is the starting point
-for an authorized session; it does not install or update either APK.
+This checks the connected device identity; installed controller, theme-client
+and ColorBlendr signers and versions; ordinary non-root ADB; and absence of the
+managed broker runtime. It performs no device writes. A healthy result is the
+starting point for an authorized session; it does not install or update an APK.
 
 ## Session controls
 
 Use `nullgate-pixi status` for status. Enable Rooted debugging on PiXi only for
-the supervised Start, Stop, or Recovery window. Start opens the controller and
-ColorBlendr; the user reviews every typed lease. Stop confirms broker shutdown,
-zero leases, log preservation, runtime removal, and returns ADB to non-root.
-Turn Rooted debugging off afterward.
+the supervised Start, Stop, or Recovery window. Choose the ColorBlendr session
+or the first-party Theme Client session; both start the same typed system-theme
+broker and open only the selected client. The user reviews every lease. Stop
+confirms broker shutdown, zero leases, log preservation and runtime removal,
+then returns ADB to non-root. Turn Rooted debugging off afterward.
 
 If Start, Stop, or Recovery reports `UNKNOWN`, preserve the runtime and logs and
 stop. Do not manually remove files under `/data/local/tmp/nullgate`. Follow
 `OPERATOR_GUIDE.md` and `DEPLOYMENT_GATE.md` for the recovery and device-test
 boundaries.
 
-The NullGate 0.2.0 theme-client APK is a host-verified development artifact.
-Its guarded installer is `install-theme-client` and requires the separate
-`NULLGATE_THEME_CLIENT_V1` mutation acknowledgement, an explicitly pinned
-device serial, the paired controller signer, an absent broker process, and an
-absent managed runtime. This setup guide does not itself authorize installation
-or live theme testing.
+The NullGate 0.2.0 controller and first-party theme client passed their
+supervised PiXi gate. Their guarded installers remain separate from this
+launcher setup and still require explicit mutation acknowledgements, a pinned
+serial, matched signers, and an absent broker/runtime. Installing the DoloWOLF
+launcher never installs or updates either Android package.

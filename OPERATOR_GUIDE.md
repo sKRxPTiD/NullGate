@@ -15,23 +15,30 @@ installer uses the dedicated `NULLGATE_TEST_CLIENT_V1` acknowledgement and
 refuses installation while a broker runtime exists. The ordinary marker-test
 token cannot install it. See `DEPLOYMENT_GATE.md` before any device use.
 
+The 0.2.0 controller and first-party NullGate Theme Client are also installed
+as a matched pair. Their supervised two-minute theme workflow passed visible
+approval, explicit revoke, natural expiry, exact restoration, reconciliation,
+broker shutdown and runtime removal on 2026-09-28. See
+`DEVICE_TEST_PASS_2026-09-28.md`.
+
 ## Normal session
 
 1. Plug PiXi into DoloWOLF and unlock the phone.
 2. On PiXi, enable **Developer options → Rooted debugging**.
 3. Double-click **NullGate · PiXi** under DoloWOLF's **All Appz** desktop folder.
-4. Choose **Start ColorBlendr NullGate session**. The launcher verifies the exact device,
-   Android/Lineage version, root identity, SELinux Enforcing state, controller
-   signer, broker artifact hash, and process identity. It then opens NullGate on
-   PiXi.
-5. If ColorBlendr Settings says **Theming is inactive**, turn its service on;
-   that requests a lease for the current color. If it is already active, choose
-   a basic color and tap **Apply**. Review and approve the 60-second request in
-   NullGate.
-6. To end early, open ColorBlendr Settings and switch its theming service off.
-   The tested path revokes the lease and restores the exact previous theme.
-   If left alone, the lease expires after 60 seconds and restores the theme
-   automatically; this ColorBlendr expiry path passed on PiXi on 2026-09-26.
+4. Choose **Start ColorBlendr NullGate session** or **Start Theme Client
+   NullGate session**. The launcher verifies the exact device, Android/Lineage
+   version, root identity, SELinux Enforcing state, controller signer, broker
+   artifact hash and process identity. It then opens NullGate and the selected
+   client on PiXi.
+5. For ColorBlendr, enable theming or apply a color and approve the 60-second
+   request. For Theme Client, choose a bounded palette/style, request the
+   two-minute lease and approve it. Every request uses NullGate's protected
+   approval screen.
+6. To end early, disable ColorBlendr theming or choose **Restore previous theme
+   now** in Theme Client. If left alone, the broker restores automatically at
+   expiry; Theme Client then requires reconciliation to collect the terminal
+   cleanup result.
 7. Open **NullGate · PiXi** on DoloWOLF again and choose
    **Stop and clean session**.
 8. Wait for the clean-session confirmation, then turn **Rooted debugging off**
@@ -76,6 +83,7 @@ nullgate-pixi status
 nullgate-pixi doctor
 nullgate-pixi start
 nullgate-pixi colorblendr
+nullgate-pixi theme
 nullgate-pixi stop
 nullgate-pixi recover
 ```
@@ -88,8 +96,8 @@ For prerequisites, the no-write setup check, installation paths, and first
 read-only connection check, see `INSTALL_AND_ONBOARD.md`.
 
 **Run read-only health check** (or `nullgate-pixi doctor`) verifies ordinary
-ADB, the installed package versions and signing certificates, and an absent
-runtime. It does not enable root or write to PiXi.
+ADB, the installed controller/theme-client/ColorBlendr versions and signing
+certificates, and an absent runtime. It does not enable root or write to PiXi.
 
 For a terminal-only health check without a desktop dialog, run
 `NULLGATE_NO_DIALOG=1 nullgate-pixi doctor`.

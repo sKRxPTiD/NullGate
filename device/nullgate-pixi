@@ -8,6 +8,7 @@ TOKEN="NULLGATE_MARKER_TEST_V1"
 THEME_TOKEN="NULLGATE_SYSTEM_THEME_V1"
 PACKAGE="org.nullprotocol.nullgate"
 COLORBLENDR_PACKAGE="com.drdisagree.colorblendr"
+THEME_CLIENT_PACKAGE="org.nullprotocol.nullgate.themeclient"
 RUNTIME="/data/local/tmp/nullgate"
 ADB_BIN="${ADB_BIN:-adb}"
 ANDROID_SDK="${ANDROID_HOME:-$HOME/Android/Sdk}"
@@ -100,7 +101,8 @@ runtime_state() {
   adb_pixi shell "if test -L $RUNTIME; then echo SYMLINK; elif test -d $RUNTIME; then stat -c 'DIR:%u:%a' $RUNTIME; elif test -e $RUNTIME; then echo OTHER; else echo ABSENT; fi" 2>/dev/null | tr -d '\r'
 }
 
-start_session() {
+start_typed_theme_session() {
+  local client_label="$1" client_activity="$2" guidance="$3"
   require_connection || return 1
   activate_root || return 1
 
@@ -126,12 +128,27 @@ start_session() {
     fail "The broker is running, but the controller screen could not be opened. Stop and clean the session before disconnecting."
     return 1
   }
-  adb_pixi shell am start -W -n "com.drdisagree.colorblendr/.ui.activities.MainActivity" >/dev/null 2>&1 || true
-  info "NullGate is ready for ColorBlendr.\n\nIf ColorBlendr Settings says Theming is inactive, turn its service on and approve the request. If it is already active, choose a color, tap Apply, and approve the request.\n\nWhen finished, switch ColorBlendr theming off, then use this launcher again and choose Stop and clean session."
+  adb_pixi shell am start -W -n "$client_activity" >/dev/null 2>&1 || {
+    fail "The broker is running, but $client_label could not be opened. Stop and clean the session before disconnecting."
+    return 1
+  }
+  info "NullGate is ready for $client_label.\n\n$guidance\n\nWhen finished, use this launcher again and choose Stop and clean session."
 }
 
 start_colorblendr_session() {
-  start_session
+  start_typed_theme_session "ColorBlendr" \
+    "$COLORBLENDR_PACKAGE/.ui.activities.MainActivity" \
+    "If ColorBlendr Settings says Theming is inactive, turn its service on and approve the request. If it is already active, choose a color, tap Apply, and approve the request. Switch ColorBlendr theming off to restore early."
+}
+
+start_theme_client_session() {
+  start_typed_theme_session "NullGate Theme Client" \
+    "$THEME_CLIENT_PACKAGE/.MainActivity" \
+    "Choose a palette and style, request the two-minute lease, and review the protected approval screen. Use Restore previous theme now for early cleanup, or allow expiry and then reconcile the terminal result."
+}
+
+start_session() {
+  start_colorblendr_session
 }
 
 stop_session() {
@@ -167,15 +184,16 @@ stop_session() {
 
 show_status() {
   require_connection || return 1
-  local identity package_path output
+  local identity package_path theme_client_path output
   identity="$(adb_pixi shell id 2>/dev/null | tr -d '\r')"
   package_path="$(adb_pixi shell pm path "$PACKAGE" 2>/dev/null | tr -d '\r')"
+  theme_client_path="$(adb_pixi shell pm path "$THEME_CLIENT_PACKAGE" 2>/dev/null | tr -d '\r')"
   if [[ "$identity" == uid=0\(* ]]; then
     output="$(helper_read status 2>&1)" || true
   else
     output="Rooted ADB is not active, so the root runtime is not being inferred."
   fi
-  info "PiXi connection: yes\nADB identity: $identity\nController installed: $([[ -n "$package_path" ]] && echo yes || echo no)\n\n$output"
+  info "PiXi connection: yes\nADB identity: $identity\nController installed: $([[ -n "$package_path" ]] && echo yes || echo no)\nTheme client installed: $([[ -n "$theme_client_path" ]] && echo yes || echo no)\n\n$output"
 }
 
 installed_apk_path() {
@@ -211,6 +229,14 @@ read_private_pin() {
   printf '%s\n' "$value"
 }
 
+source_version_code() {
+  local manifest="$1" value
+  [[ -f "$manifest" && ! -L "$manifest" ]] || return 1
+  value="$(sed -n 's/.*android:versionCode="\([0-9][0-9]*\)".*/\1/p' "$manifest")"
+  [[ "$value" =~ ^[0-9]+$ && "$(printf '%s\n' "$value" | wc -l)" == 1 ]] || return 1
+  printf '%s\n' "$value"
+}
+
 health_check() {
   require_connection || return 1
   [[ -x "$APKSIGNER" ]] || {
@@ -218,8 +244,10 @@ health_check() {
     return 1
   }
 
-  local identity controller_signer colorblendr_signer controller_version colorblendr_version runtime
-  local expected_controller_signer expected_colorblendr_signer expected_controller_version expected_colorblendr_version
+  local identity controller_signer colorblendr_signer theme_client_signer
+  local controller_version colorblendr_version theme_client_version runtime
+  local expected_controller_signer expected_colorblendr_signer
+  local expected_controller_version expected_colorblendr_version expected_theme_client_version
   expected_controller_signer="$(read_private_pin controller.signer.sha256)" || {
     fail "The PiXi private controller identity pin is unavailable."
     return 1
@@ -228,11 +256,19 @@ health_check() {
     fail "The PiXi private ColorBlendr identity pin is unavailable."
     return 1
   }
-  expected_controller_version="$(read_private_pin controller.versionCode)" || return 1
+  expected_controller_version="$(source_version_code "$PROJECT/AndroidManifest.xml")" || {
+    fail "The active controller version metadata is unavailable."
+    return 1
+  }
+  expected_theme_client_version="$(source_version_code "$PROJECT/theme-client/AndroidManifest.xml")" || {
+    fail "The active theme-client version metadata is unavailable."
+    return 1
+  }
   expected_colorblendr_version="$(read_private_pin colorblendr.versionCode)" || return 1
   [[ "$expected_controller_signer" =~ ^[0-9a-f]{64}$ &&
       "$expected_colorblendr_signer" =~ ^[0-9a-f]{64}$ &&
       "$expected_controller_version" =~ ^[0-9]+$ &&
+      "$expected_theme_client_version" =~ ^[0-9]+$ &&
       "$expected_colorblendr_version" =~ ^[0-9]+$ ]] || {
     fail "The PiXi private identity metadata is malformed."
     return 1
@@ -250,6 +286,10 @@ health_check() {
     fail "The installed ColorBlendr fork identity could not be verified."
     return 1
   }
+  theme_client_signer="$(installed_signer "$THEME_CLIENT_PACKAGE")" || {
+    fail "The installed NullGate Theme Client identity could not be verified."
+    return 1
+  }
   [[ "$controller_signer" == "$expected_controller_signer" ]] || {
     fail "The installed NullGate controller signer does not match the paired PiXi build."
     return 1
@@ -258,11 +298,17 @@ health_check() {
     fail "The installed ColorBlendr signer does not match the admitted private fork."
     return 1
   }
+  [[ "$theme_client_signer" == "$expected_controller_signer" ]] || {
+    fail "The installed NullGate Theme Client signer does not match the paired controller."
+    return 1
+  }
   controller_version="$(adb_pixi shell dumpsys package "$PACKAGE" 2>/dev/null | sed -n 's/^[[:space:]]*versionCode=\([0-9]*\).*/\1/p' | head -1 | tr -d '\r')"
   colorblendr_version="$(adb_pixi shell dumpsys package "$COLORBLENDR_PACKAGE" 2>/dev/null | sed -n 's/^[[:space:]]*versionCode=\([0-9]*\).*/\1/p' | head -1 | tr -d '\r')"
+  theme_client_version="$(adb_pixi shell dumpsys package "$THEME_CLIENT_PACKAGE" 2>/dev/null | sed -n 's/^[[:space:]]*versionCode=\([0-9]*\).*/\1/p' | head -1 | tr -d '\r')"
   [[ "$controller_version" == "$expected_controller_version" &&
-      "$colorblendr_version" == "$expected_colorblendr_version" ]] || {
-    fail "Installed version pins do not match the verified pair.\n\nController: $controller_version\nColorBlendr: $colorblendr_version"
+      "$colorblendr_version" == "$expected_colorblendr_version" &&
+      "$theme_client_version" == "$expected_theme_client_version" ]] || {
+    fail "Installed version pins do not match the verified set.\n\nController: $controller_version\nTheme client: $theme_client_version\nColorBlendr: $colorblendr_version"
     return 1
   }
   runtime="$(runtime_state)"
@@ -270,7 +316,7 @@ health_check() {
     fail "A NullGate runtime still exists: $runtime\n\nUse Status and the guarded Stop or Recovery action."
     return 1
   }
-  info "PiXi NullGate health check passed.\n\nADB: ordinary shell\nController: version $controller_version, paired signer verified\nColorBlendr: version $colorblendr_version, admitted signer verified\nRuntime: absent\nDevice writes performed: none"
+  info "PiXi NullGate health check passed.\n\nADB: ordinary shell\nController: version $controller_version, paired signer verified\nTheme client: version $theme_client_version, paired signer verified\nColorBlendr: version $colorblendr_version, admitted signer verified\nRuntime: absent\nDevice writes performed: none"
 }
 
 recover_runtime() {
@@ -306,7 +352,8 @@ menu() {
       choice="$(zenity --list --title="NullGate · PiXi" --width=620 --height=380 \
         --text="PiXi must be plugged in and unlocked. Enable Rooted debugging before Start, Stop, or Recovery." \
         --column="Action" --column="What it does" \
-        "Start ColorBlendr NullGate session" "Verify PiXi and launch the temporary theme broker" \
+        "Start ColorBlendr NullGate session" "Verify PiXi and open the admitted ColorBlendr client" \
+        "Start Theme Client NullGate session" "Verify PiXi and open the first-party theme client" \
         "Stop and clean session" "Revoke/stop, archive the log, remove runtime, unroot ADB" \
         "Show status" "Read connection and verified broker status" \
         "Run read-only health check" "Verify installed identities and clean idle state" \
@@ -315,21 +362,23 @@ menu() {
     else
       printf '\nNullGate · PiXi — device must be plugged in and unlocked.\n'
       printf 'Enable Rooted debugging only for Start, Stop, or Recovery.\n'
-      printf '1) Start ColorBlendr session\n2) Stop and clean session\n'
-      printf '3) Show status\n4) Read-only health check\n'
-      printf '5) Recover verified stale runtime\n6) Exit\n'
-      read -r -p 'Select [1-6]: ' selection || return
+      printf '1) Start ColorBlendr session\n2) Start Theme Client session\n'
+      printf '3) Stop and clean session\n4) Show status\n'
+      printf '5) Read-only health check\n6) Recover verified stale runtime\n7) Exit\n'
+      read -r -p 'Select [1-7]: ' selection || return
       case "$selection" in
         1) choice="Start ColorBlendr NullGate session" ;;
-        2) choice="Stop and clean session" ;;
-        3) choice="Show status" ;;
-        4) choice="Run read-only health check" ;;
-        5) choice="Recover verified stale runtime" ;;
+        2) choice="Start Theme Client NullGate session" ;;
+        3) choice="Stop and clean session" ;;
+        4) choice="Show status" ;;
+        5) choice="Run read-only health check" ;;
+        6) choice="Recover verified stale runtime" ;;
         *) return ;;
       esac
     fi
     case "$choice" in
       "Start ColorBlendr NullGate session") start_session ;;
+      "Start Theme Client NullGate session") start_theme_client_session ;;
       "Stop and clean session") stop_session ;;
       "Show status") show_status ;;
       "Run read-only health check") health_check ;;
@@ -343,9 +392,10 @@ case "${1:-menu}" in
   menu) menu ;;
   start) start_session ;;
   colorblendr) start_colorblendr_session ;;
+  theme) start_theme_client_session ;;
   stop) stop_session ;;
   status) show_status ;;
   doctor) health_check ;;
   recover) recover_runtime ;;
-  *) printf 'Usage: nullgate-pixi {menu|start|colorblendr|stop|status|doctor|recover}\n' >&2; exit 2 ;;
+  *) printf 'Usage: nullgate-pixi {menu|start|colorblendr|theme|stop|status|doctor|recover}\n' >&2; exit 2 ;;
 esac

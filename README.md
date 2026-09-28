@@ -15,7 +15,7 @@ case baked into the broker.
 The controller uses green circuit branding and the ∅ mark over a cappuccino
 palette.
 
-## Current result — 2026-09-26
+## Current result — 2026-09-28
 
 The signed controller and separate Android broker build locally. The marker
 lease and native 60-second theme lease have both passed supervised PiXi tests,
@@ -36,9 +36,11 @@ Lost replies, restart and unknown broker records are not presented as no root.
 The local log is bounded to 16 KiB; it is not a tamper-proof audit ledger.
 A marker is a lifecycle test, not proof of reversible privilege in other apps.
 
-The current verified PiXi controller remains NullGate 0.1.0 (version code 2).
-Active source is the host-only 0.2.0 development line (version code 3). See
-`STATUS.md` for the concise completed-versus-remaining product boundary.
+The immutable verified release baseline remains NullGate 0.1.0 (version code
+2). PiXi now runs the active 0.2.0 development controller (version code 3) and
+first-party theme client after their supervised device gate passed. See
+`STATUS.md` and `DEVICE_TEST_PASS_2026-09-28.md` for the boundary between the
+release baseline and validated development state.
 
 ## Build and tests
 
@@ -59,9 +61,10 @@ signing identity is never generated implicitly; `./build.sh
 --init-dev-signing` is the deliberate bootstrap command when both development
 signing files are absent.
 
-Current result: **174 host Java checks** (74 broker/security, 66 external-client
-policy/state, and 34 test-client response/lifecycle checks) and the stateful device-helper scenario suite pass, including
-additional final-review regressions.
+Current result: **199 host Java checks** (74 broker/security, 76 external-client
+policy/state, 34 test-client response/lifecycle, and 15 theme-client lifecycle
+checks) and the stateful device-helper scenario suite pass, including additional
+final-review regressions.
 These do not execute Android socket, SELinux, Activity lifecycle, app_process,
 filesystem or shutdown behavior. No Android emulator/instrumentation test has
 been run for this audit.
@@ -84,6 +87,7 @@ third-party compatibility remains unverified.
 Outputs:
 - `dist/NullGate-prototype-debug.apk`
 - `dist/NullGate-test-client-debug.apk`
+- `dist/NullGate-theme-client-debug.apk`
 - `dist/NullGate-broker.jar`
 - `dist/controller-cert-sha256.txt`
 - `dist/SHA256SUMS`
@@ -160,9 +164,10 @@ obscured-touch-protected approval screen, persists uncertain outcomes, and
 binds revoke to the original caller. Both first-party clients are distinct
 packages and UIDs, are signed with the controller's selected identity, and
 receive only lease receipts. A signer-pinning reference client compiles with every
-build. The 0.2.0 controller and theme-client signed host build and simulated
-device-helper suite pass; they remain off-device. A direct ADB-shell spoof
-attempt on PiXi was denied with no broker
+build. The 0.2.0 controller and theme client passed their signed host build,
+simulated device-helper suite and supervised PiXi
+grant/revoke/expiry/restoration gate. A direct ADB-shell spoof attempt on PiXi
+was denied with no broker
 runtime and ADB remaining non-root. The matching ColorBlendr client patch now
 builds off-device, rejects malformed or ambiguous Activity results, and
 reconciles interrupted grant/revoke operations instead of treating them as
