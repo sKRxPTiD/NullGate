@@ -85,3 +85,5 @@ baseline hash, and the recreated client retained Ember/EXPRESSIVE while showing
 `Lease deadline passed; reconcile to confirm restoration.` Reconciliation then
 reported no active lease. Final shutdown confirmed no controller record, zero
 leases, an absent managed runtime, ADB UID 2000 and SELinux Enforcing.
+The operator then switched Rooted debugging off, and the installed DoloWOLF
+doctor passed all package identity, signer, version and clean-idle checks.

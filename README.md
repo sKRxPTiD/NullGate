@@ -48,10 +48,20 @@ Install JDK 17 and Android SDK Platform 36 with Build Tools 36.0.0, set
 `ANDROID_HOME` when the SDK is not under `~/Android/Sdk`, and provide the
 matched existing `nullgate-local.keystore` plus `.nullgate-local.pass` through
 `NULLGATE_KEY_DIR` and `NULLGATE_KEYPASS_FILE` when they are not under `keys/`.
-Then run `./build.sh`. It compiles and tests the Java core, builds both Android
+Then run `./build.sh`. It compiles and tests the Java core, builds all Android
 artifacts, verifies APK signatures and records SHA-256 checksums, then runs
 simulated device-helper tests. Device tests run after artifacts exist, so the
 full build no longer depends on a previous dist directory.
+
+Generated archive inputs use a fixed timestamp, compiler inputs are sorted,
+transient ZIP metadata is stripped, and APKs explicitly use deterministic
+v2/v3 signing without the unused v1/JAR scheme. Repeated builds from identical
+source, tools and signing identity must therefore produce identical artifact
+hashes.
+
+Run `release/verify-reproducible-build.sh` for a two-clean-build comparison.
+The latest verified manifest and the boundary between host reproducibility and
+device validation are recorded in `REPRODUCIBLE_BUILD_2026-09-28.md`.
 
 Use `./build.sh --preflight` to validate dependencies, release metadata, and
 the selected signing pair without changing files. Use `./build.sh --host-only`

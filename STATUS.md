@@ -71,3 +71,8 @@ PiXi. Its selected palette/style now survive theme-driven Activity recreation,
 and natural expiry displays specific reconciliation guidance without treating
 elapsed local time as cleanup proof. Exact restoration, reconciliation and
 final zero-runtime shutdown passed again.
+
+The paired build is now byte-reproducible across consecutive clean signed host
+builds; see `REPRODUCIBLE_BUILD_2026-09-28.md`. Deterministic packaging changes
+the APK/JAR byte identities, so that exact artifact set still requires its own
+supervised PiXi gate before any 0.2.0 bundle can be promoted into `releases/`.

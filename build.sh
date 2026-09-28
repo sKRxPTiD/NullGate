@@ -14,6 +14,8 @@ KEYPASS_FILE="${NULLGATE_KEYPASS_FILE:-$KEYPASS_FILE}"
 RUN_DEVICE_HARNESS=1
 INIT_DEV_SIGNING=0
 PREFLIGHT_ONLY=0
+REPRODUCIBLE_EPOCH=946684800
+export TZ=UTC
 
 usage() {
   cat <<'EOF'
@@ -60,6 +62,11 @@ fi
 die() {
   echo "NullGate build: $*" >&2
   exit 1
+}
+
+normalize_archive_inputs() {
+  local directory="$1"
+  find "$directory" -type f -exec touch -d "@$REPRODUCIBLE_EPOCH" -- {} +
 }
 
 INIT_TMP_DIR=""
@@ -139,15 +146,18 @@ mkdir -p "$OUT_DIR/compiled-res" "$OUT_DIR/classes" "$OUT_DIR/dex" "$OUT_DIR/bro
   -I "$ANDROID_JAR" --min-sdk-version 26 --target-sdk-version 36 \
   -o "$OUT_DIR/base.apk" "$OUT_DIR/compiled-res"/*.flat
 
-mapfile -d '' -t controller_sources < <(find "$BASE_DIR/common/src" "$BASE_DIR/src" -name '*.java' -print0)
+mapfile -d '' -t controller_sources < <(find "$BASE_DIR/common/src" "$BASE_DIR/src" \
+  -name '*.java' -print0 | sort -z)
 javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/classes" "${controller_sources[@]}"
-mapfile -d '' -t controller_classes < <(find "$OUT_DIR/classes" -name '*.class' -print0)
+mapfile -d '' -t controller_classes < <(find "$OUT_DIR/classes" -name '*.class' -print0 | sort -z)
 "$BUILD_TOOLS/d8" --min-api 26 --lib "$ANDROID_JAR" --output "$OUT_DIR/dex" \
   "${controller_classes[@]}"
-(cd "$OUT_DIR/dex" && zip -q -j "$OUT_DIR/base.apk" classes.dex)
+normalize_archive_inputs "$OUT_DIR/dex"
+(cd "$OUT_DIR/dex" && zip -X -q -j "$OUT_DIR/base.apk" classes.dex)
 
 # Compile the standalone client reference against the same Android API surface.
-mapfile -d '' -t reference_sources < <(find "$BASE_DIR/client/reference" -name '*.java' -print0)
+mapfile -d '' -t reference_sources < <(find "$BASE_DIR/client/reference" \
+  -name '*.java' -print0 | sort -z)
 javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/client-reference" \
   "${reference_sources[@]}"
 
@@ -160,10 +170,12 @@ javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/test-client-classes" \
   "$BASE_DIR/common/src/org/nullprotocol/nullgate/protocol/ExternalResultPolicy.java" \
   "$BASE_DIR/test-client/src/org/nullprotocol/nullgate/testclient/MainActivity.java" \
   "$BASE_DIR/test-client/src/org/nullprotocol/nullgate/testclient/TestClientStatePolicy.java"
-mapfile -d '' -t test_client_classes < <(find "$OUT_DIR/test-client-classes" -name '*.class' -print0)
+mapfile -d '' -t test_client_classes < <(find "$OUT_DIR/test-client-classes" \
+  -name '*.class' -print0 | sort -z)
 "$BUILD_TOOLS/d8" --min-api 26 --lib "$ANDROID_JAR" --output "$OUT_DIR/test-client-dex" \
   "${test_client_classes[@]}"
-(cd "$OUT_DIR/test-client-dex" && zip -q -j "$OUT_DIR/test-client-base.apk" classes.dex)
+normalize_archive_inputs "$OUT_DIR/test-client-dex"
+(cd "$OUT_DIR/test-client-dex" && zip -X -q -j "$OUT_DIR/test-client-base.apk" classes.dex)
 
 # Build the paired first-party theme client as a distinct package and UID.
 "$BUILD_TOOLS/aapt2" link --manifest "$BASE_DIR/theme-client/AndroidManifest.xml" \
@@ -174,27 +186,32 @@ javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/theme-client-classes" \
   "$BASE_DIR/common/src/org/nullprotocol/nullgate/protocol/ExternalResultPolicy.java" \
   "$BASE_DIR/theme-client/src/org/nullprotocol/nullgate/themeclient/MainActivity.java" \
   "$BASE_DIR/theme-client/src/org/nullprotocol/nullgate/themeclient/ThemeClientStatePolicy.java"
-mapfile -d '' -t theme_client_classes < <(find "$OUT_DIR/theme-client-classes" -name '*.class' -print0)
+mapfile -d '' -t theme_client_classes < <(find "$OUT_DIR/theme-client-classes" \
+  -name '*.class' -print0 | sort -z)
 "$BUILD_TOOLS/d8" --min-api 26 --lib "$ANDROID_JAR" --output "$OUT_DIR/theme-client-dex" \
   "${theme_client_classes[@]}"
-(cd "$OUT_DIR/theme-client-dex" && zip -q -j "$OUT_DIR/theme-client-base.apk" classes.dex)
+normalize_archive_inputs "$OUT_DIR/theme-client-dex"
+(cd "$OUT_DIR/theme-client-dex" && zip -X -q -j "$OUT_DIR/theme-client-base.apk" classes.dex)
 
 "$BUILD_TOOLS/zipalign" -f 4 "$OUT_DIR/base.apk" "$OUT_DIR/aligned.apk"
-"$BUILD_TOOLS/apksigner" sign --ks "$KEYSTORE" --ks-key-alias nullgate-local \
+"$BUILD_TOOLS/apksigner" sign --v1-signing-enabled false \
+  --ks "$KEYSTORE" --ks-key-alias nullgate-local \
   --ks-pass "file:$KEYPASS_FILE" \
   --out "$DIST_DIR/NullGate-prototype-debug.apk" "$OUT_DIR/aligned.apk"
 "$BUILD_TOOLS/apksigner" verify --verbose "$DIST_DIR/NullGate-prototype-debug.apk"
 
 "$BUILD_TOOLS/zipalign" -f 4 "$OUT_DIR/test-client-base.apk" \
   "$OUT_DIR/test-client-aligned.apk"
-"$BUILD_TOOLS/apksigner" sign --ks "$KEYSTORE" --ks-key-alias nullgate-local \
+"$BUILD_TOOLS/apksigner" sign --v1-signing-enabled false \
+  --ks "$KEYSTORE" --ks-key-alias nullgate-local \
   --ks-pass "file:$KEYPASS_FILE" \
   --out "$DIST_DIR/NullGate-test-client-debug.apk" "$OUT_DIR/test-client-aligned.apk"
 "$BUILD_TOOLS/apksigner" verify --verbose "$DIST_DIR/NullGate-test-client-debug.apk"
 
 "$BUILD_TOOLS/zipalign" -f 4 "$OUT_DIR/theme-client-base.apk" \
   "$OUT_DIR/theme-client-aligned.apk"
-"$BUILD_TOOLS/apksigner" sign --ks "$KEYSTORE" --ks-key-alias nullgate-local \
+"$BUILD_TOOLS/apksigner" sign --v1-signing-enabled false \
+  --ks "$KEYSTORE" --ks-key-alias nullgate-local \
   --ks-pass "file:$KEYPASS_FILE" \
   --out "$DIST_DIR/NullGate-theme-client-debug.apk" "$OUT_DIR/theme-client-aligned.apk"
 "$BUILD_TOOLS/apksigner" verify --verbose "$DIST_DIR/NullGate-theme-client-debug.apk"
@@ -210,13 +227,16 @@ verify_manifest_identity "$DIST_DIR/NullGate-test-client-debug.apk" org.nullprot
 verify_manifest_identity "$DIST_DIR/NullGate-theme-client-debug.apk" org.nullprotocol.nullgate.themeclient 1
 bash "$BASE_DIR/release/check-release-metadata.sh" --with-apk
 
-mapfile -d '' -t broker_sources < <(find "$BASE_DIR/common/src" "$BASE_DIR/broker/src" "$BASE_DIR/broker/android" -name '*.java' -print0)
+mapfile -d '' -t broker_sources < <(find "$BASE_DIR/common/src" "$BASE_DIR/broker/src" \
+  "$BASE_DIR/broker/android" -name '*.java' -print0 | sort -z)
 javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/broker-classes" \
   "${broker_sources[@]}"
-mapfile -d '' -t broker_classes < <(find "$OUT_DIR/broker-classes" -name '*.class' -print0)
+mapfile -d '' -t broker_classes < <(find "$OUT_DIR/broker-classes" \
+  -name '*.class' -print0 | sort -z)
 "$BUILD_TOOLS/d8" --min-api 26 --lib "$ANDROID_JAR" --output "$OUT_DIR/broker-dex" \
   "${broker_classes[@]}"
-(cd "$OUT_DIR/broker-dex" && zip -q -j "$DIST_DIR/NullGate-broker.jar" classes.dex)
+normalize_archive_inputs "$OUT_DIR/broker-dex"
+(cd "$OUT_DIR/broker-dex" && zip -X -q -j "$DIST_DIR/NullGate-broker.jar" classes.dex)
 "$BUILD_TOOLS/apksigner" verify --print-certs "$DIST_DIR/NullGate-prototype-debug.apk" \
   | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' > "$DIST_DIR/controller-cert-sha256.txt"
 (cd "$DIST_DIR" && sha256sum NullGate-prototype-debug.apk NullGate-test-client-debug.apk \
