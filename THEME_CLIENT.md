@@ -29,10 +29,16 @@ Before dispatch, the client durably records `PENDING`. A valid grant advances to
 lease cannot be requested until NullGate confirms revoke or reconciliation.
 Expired local time is not treated as cleanup proof.
 
+The client preserves the last submitted palette and style separately from lease
+state so Android theme-driven Activity recreation cannot display default
+selectors beside a different active request. Once an active local deadline has
+passed, the UI explicitly requests reconciliation; elapsed local time still
+does not claim that broker restoration succeeded.
+
 ## Current gate
 
 The signed host build, client policy tests, lifecycle tests, APK identity,
-paired signer and checksum verification pass. This does not authorize device
-installation. PiXi installation, live theme mutation and release packaging need
-their own reviewed operator gate. The existing verified ColorBlendr deployment
-remains the active private client baseline.
+paired signer and checksum verification pass. The reviewed 0.2.0 candidate also
+passed supervised PiXi installation, visible approval, explicit revoke, natural
+expiry, exact restoration and reconciliation. Release packaging remains a
+separate gate, and the immutable 0.1.0 bundle remains the release baseline.

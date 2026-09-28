@@ -19,6 +19,12 @@ public final class ThemeClientStatePolicy {
         return UNKNOWN;
     }
 
+    public static boolean isExpiredActive(String storedPhase, boolean hasLeaseId,
+            long expiresElapsed, long nowElapsed) {
+        return ACTIVE.equals(storedPhase) && hasLeaseId
+                && expiresElapsed > 0L && expiresElapsed <= nowElapsed;
+    }
+
     public static boolean canRequest(String phase) { return CLEAN.equals(phase); }
     public static boolean needsReconcile(String phase) {
         return PENDING.equals(phase) || UNKNOWN.equals(phase);

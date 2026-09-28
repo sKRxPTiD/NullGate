@@ -14,11 +14,16 @@ public final class ThemeClientStatePolicyTest {
                 ThemeClientStatePolicy.normalize("ACTIVE", true, 100L, 100L)));
         check(ThemeClientStatePolicy.UNKNOWN.equals(
                 ThemeClientStatePolicy.normalize(null, true, 200L, 100L)));
+        check(ThemeClientStatePolicy.isExpiredActive("ACTIVE", true, 100L, 100L));
+        check(ThemeClientStatePolicy.isExpiredActive("ACTIVE", true, 100L, 101L));
+        check(!ThemeClientStatePolicy.isExpiredActive("ACTIVE", true, 101L, 100L));
+        check(!ThemeClientStatePolicy.isExpiredActive("ACTIVE", false, 100L, 101L));
+        check(!ThemeClientStatePolicy.isExpiredActive("UNKNOWN", true, 100L, 101L));
         check(ThemeClientStatePolicy.canRequest("CLEAN"));
         check(!ThemeClientStatePolicy.canRequest("PENDING"));
         check(ThemeClientStatePolicy.needsReconcile("PENDING"));
         check(ThemeClientStatePolicy.needsReconcile("UNKNOWN"));
-        System.out.println("NullGate theme-client lifecycle checks: 10 passed");
+        System.out.println("NullGate theme-client lifecycle checks: 15 passed");
     }
 
     private static void check(boolean value) { if (!value) throw new AssertionError(); }

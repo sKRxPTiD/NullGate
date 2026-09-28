@@ -34,6 +34,9 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_RECONCILE = 2003;
     private static final long LEASE_DURATION_MILLIS = 120_000L;
     private static final String STORE = "theme_client_state";
+    private static final String SELECTION_STORE = "theme_client_selection";
+    private static final String SELECTED_PALETTE = "selected_palette";
+    private static final String SELECTED_STYLE = "selected_style";
     private static final String[] PALETTE_NAMES = {
             "Null green", "Signal violet", "Ember"
     };
@@ -56,6 +59,7 @@ public final class MainActivity extends Activity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
         if (android.os.Build.VERSION.SDK_INT >= 31) getWindow().setHideOverlayWindows(true);
         setContentView(buildPage());
+        restoreSelection();
         refreshState();
     }
 
@@ -123,6 +127,12 @@ public final class MainActivity extends Activity {
         if (paletteIndex < 0 || paletteIndex >= PALETTE_SEEDS.length
                 || styleIndex < 0 || styleIndex >= STYLE_NAMES.length) {
             status.setText("Selection is invalid; no request was sent.");
+            return;
+        }
+        if (!selectionStore().edit()
+                .putInt(SELECTED_PALETTE, paletteIndex)
+                .putInt(SELECTED_STYLE, styleIndex).commit()) {
+            status.setText("Request not sent: the selected theme could not be recorded.");
             return;
         }
         requestButton.setEnabled(false);
@@ -259,16 +269,25 @@ public final class MainActivity extends Activity {
             refreshButtons(ThemeClientStatePolicy.UNKNOWN);
             return;
         }
-        String phase = currentPhase();
+        SharedPreferences state = store();
+        String storedPhase = state.getString("phase", null);
+        boolean hasLeaseId = state.getString(
+                ExternalClientContract.EXTRA_LEASE_ID, null) != null;
+        long expiresElapsed = state.getLong(
+                ExternalClientContract.EXTRA_EXPIRES_ELAPSED, 0L);
+        long nowElapsed = SystemClock.elapsedRealtime();
+        boolean expiredActive = ThemeClientStatePolicy.isExpiredActive(
+                storedPhase, hasLeaseId, expiresElapsed, nowElapsed);
+        String phase = currentPhase(nowElapsed);
         if (ThemeClientStatePolicy.CLEAN.equals(phase)) {
             status.setText("Ready. Choose a palette and style.");
+        } else if (expiredActive) {
+            status.setText("Lease deadline passed; reconcile to confirm restoration.");
         } else if (ThemeClientStatePolicy.PENDING.equals(phase)
                 || ThemeClientStatePolicy.UNKNOWN.equals(phase)) {
             status.setText("An earlier result is unresolved. Reconcile before requesting again.");
         } else {
-            long remaining = store().getLong(
-                    ExternalClientContract.EXTRA_EXPIRES_ELAPSED, 0L)
-                    - SystemClock.elapsedRealtime();
+            long remaining = expiresElapsed - nowElapsed;
             status.setText(remaining > 0
                     ? "Theme lease active for at most " + ((remaining + 999L) / 1000L)
                         + " seconds."
@@ -277,14 +296,17 @@ public final class MainActivity extends Activity {
         refreshButtons(phase);
     }
 
-    private String currentPhase() {
+    private String currentPhase(long nowElapsed) {
         String leaseId = store().getString(ExternalClientContract.EXTRA_LEASE_ID, null);
         String stored = store().getString("phase", null);
-        String phase = ThemeClientStatePolicy.normalize(stored, leaseId != null,
-                store().getLong(ExternalClientContract.EXTRA_EXPIRES_ELAPSED, 0L),
-                SystemClock.elapsedRealtime());
+        long expiresElapsed = store().getLong(
+                ExternalClientContract.EXTRA_EXPIRES_ELAPSED, 0L);
+        boolean expiredActive = ThemeClientStatePolicy.isExpiredActive(
+                stored, leaseId != null, expiresElapsed, nowElapsed);
+        String phase = ThemeClientStatePolicy.normalize(
+                stored, leaseId != null, expiresElapsed, nowElapsed);
         if (ThemeClientStatePolicy.UNKNOWN.equals(phase)
-                && !ThemeClientStatePolicy.UNKNOWN.equals(stored))
+                && !ThemeClientStatePolicy.UNKNOWN.equals(stored) && !expiredActive)
             store().edit().putString("phase", ThemeClientStatePolicy.UNKNOWN).commit();
         return phase;
     }
@@ -305,6 +327,16 @@ public final class MainActivity extends Activity {
         requestButton.setEnabled(false);
         revokeButton.setEnabled(false);
         reconcileButton.setEnabled(false);
+    }
+
+    private void restoreSelection() {
+        SharedPreferences selected = selectionStore();
+        int paletteIndex = selected.getInt(SELECTED_PALETTE, 0);
+        int styleIndex = selected.getInt(SELECTED_STYLE, 0);
+        if (paletteIndex >= 0 && paletteIndex < PALETTE_SEEDS.length)
+            palette.setSelection(paletteIndex);
+        if (styleIndex >= 0 && styleIndex < STYLE_NAMES.length)
+            style.setSelection(styleIndex);
     }
 
     private boolean pairedControllerInstalled() {
@@ -365,6 +397,9 @@ public final class MainActivity extends Activity {
     }
 
     private SharedPreferences store() { return getSharedPreferences(STORE, MODE_PRIVATE); }
+    private SharedPreferences selectionStore() {
+        return getSharedPreferences(SELECTION_STORE, MODE_PRIVATE);
+    }
     private int dp(int value) {
         return (int)(value * getResources().getDisplayMetrics().density + 0.5f);
     }

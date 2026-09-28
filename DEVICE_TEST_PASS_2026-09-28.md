@@ -65,6 +65,5 @@ reconciliation reported: `Reconciled clean: no active theme lease remains.`
 - Broker log was archived and the managed runtime was removed.
 - The managed runtime path passed `verify-clean`.
 - ADB was returned to UID 2000 (`u:r:shell:s0`) with SELinux Enforcing.
-- Rooted debugging must remain off outside a supervised NullGate session; the
-  final toggle position is an operator-visible setting and was not read by ADB.
-
+- Rooted debugging was switched off by the operator after ADB returned to UID
+  2000. SELinux remained Enforcing and no managed broker runtime remained.
