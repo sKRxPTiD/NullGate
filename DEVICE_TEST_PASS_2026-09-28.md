@@ -87,3 +87,20 @@ reported no active lease. Final shutdown confirmed no controller record, zero
 leases, an absent managed runtime, ADB UID 2000 and SELinux Enforcing.
 The operator then switched Rooted debugging off, and the installed DoloWOLF
 doctor passed all package identity, signer, version and clean-idle checks.
+
+## Deterministic-artifact follow-up
+
+After the build was made byte-reproducible, the exact deterministic controller
+APK `7c5c2ed63eace24c4cc318c8833b5f1da6265abbe1ae4e4af5524dc1cce99b7d`
+and theme-client APK
+`ebe16630f37141bee790fcdfadd1ab2b1878e4f1f5fd74d3bdd7f8e2f27536e0`
+were installed and pulled back byte-for-byte. The exact broker JAR
+`d8bfb818754dea0d4d986e359e2b958056e233bb632a0ca7d00ee3f3b959fb52`
+was deployed.
+
+That matched set passed an Ember/EXPRESSIVE grant followed by explicit revoke,
+then a second grant followed by natural 120-second expiry. Both paths restored
+the baseline hash exactly. Expiry guidance and retained selection remained
+correct; reconciliation reported no active lease. Final shutdown found no
+controller record or lease markers, archived the broker log, removed the
+runtime, returned ADB to UID 2000 and passed the installed launcher doctor.

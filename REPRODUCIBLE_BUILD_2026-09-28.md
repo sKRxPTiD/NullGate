@@ -19,9 +19,12 @@ d8bfb818754dea0d4d986e359e2b958056e233bb632a0ca7d00ee3f3b959fb52  NullGate-broke
 Run `release/verify-reproducible-build.sh` to repeat the two-pass check. It
 replaces `build/` and `dist/` twice but does not contact or modify PiXi.
 
-These are new byte identities created by deterministic packaging. Their source
-logic passed the preceding host and PiXi tests, but this exact controller APK,
-theme-client APK and broker JAR set has not yet passed the supervised device
-gate. It must not be promoted into the immutable `releases/` directory until
-that exact set is installed/deployed, pulled back where applicable, and its
-grant/revoke/expiry/restoration lifecycle is revalidated.
+These are new byte identities created by deterministic packaging. The exact
+controller and theme-client APKs were subsequently installed on PiXi and pulled
+back byte-for-byte. The exact broker JAR was deployed. That matched set passed
+visible grant, explicit revoke, natural expiry, exact restoration, client
+reconciliation, zero-lease shutdown, runtime removal and return to non-root ADB.
+
+The test-client APK remains a host/device-development harness and is not part of
+the proposed private 0.2.0 operator payload. The immutable `releases/` baseline
+was not changed during reproducibility or device validation.

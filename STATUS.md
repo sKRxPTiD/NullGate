@@ -73,6 +73,8 @@ elapsed local time as cleanup proof. Exact restoration, reconciliation and
 final zero-runtime shutdown passed again.
 
 The paired build is now byte-reproducible across consecutive clean signed host
-builds; see `REPRODUCIBLE_BUILD_2026-09-28.md`. Deterministic packaging changes
-the APK/JAR byte identities, so that exact artifact set still requires its own
-supervised PiXi gate before any 0.2.0 bundle can be promoted into `releases/`.
+builds; see `REPRODUCIBLE_BUILD_2026-09-28.md`. The exact deterministic
+controller, theme-client and broker artifacts subsequently passed their own
+supervised PiXi grant/revoke/expiry/restoration gate. They are eligible for a
+separately reviewed 0.2.0 candidate bundle; no bundle has been promoted into
+the immutable `releases/` directory.
