@@ -64,6 +64,8 @@ client package and independently recorded restored-theme hash. It stops the
 controller, verifies the reviewed controller version and signer, requires no
 broker or runtime, rejects a live/unexpired/unsafe record, archives the exact
 record under `device/logs`, and removes only that verified preference file.
+The archive is hash-verified after writing; TerraDrive's FUSE mount may expose
+uniform permission bits rather than honoring mode 0600.
 
 ## Command path
 

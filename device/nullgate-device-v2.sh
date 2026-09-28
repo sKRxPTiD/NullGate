@@ -632,7 +632,11 @@ recover_controller_record() {
 
   mkdir -p "$LOG_DIR"
   archived_copy="$LOG_DIR/controller-record-$SERIAL-$(date -u +%Y%m%dT%H%M%SZ)-$expected_record_hash.xml"
-  install -m 0600 "$record_copy" "$archived_copy"
+  cp -- "$record_copy" "$archived_copy" \
+    || { rm -rf -- "$temp_dir"; die "controller recovery archive could not be written"; }
+  chmod 0600 "$archived_copy" 2>/dev/null || true
+  [[ "$(sha256sum "$archived_copy" | awk '{print $1}')" == "$expected_record_hash" ]] \
+    || { rm -rf -- "$temp_dir"; die "controller recovery archive failed hash verification"; }
   rm -rf -- "$temp_dir"
 
   require_no_broker
