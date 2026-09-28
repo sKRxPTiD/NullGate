@@ -66,6 +66,14 @@ stop. Do not manually remove files under `/data/local/tmp/nullgate`. Follow
 `OPERATOR_GUIDE.md` and `DEPLOYMENT_GATE.md` for the recovery and device-test
 boundaries.
 
+Recovery also stops if snapshot or log hashes cannot be verified, if host
+archival fails, or if a broker appears during recovery. A normal-looking theme
+does not prove cleanup succeeded: restoration may precede an archive failure.
+Keep the remaining receipts, runtime and partial host archives for inspection.
+The current host helper's hardening and its validation limits are recorded in
+`RECOVERY_HARDENING_2026-09-28.md`; the preserved RC1 bundle retains its original
+helper.
+
 The NullGate 0.2.0 controller and first-party theme client passed their
 supervised PiXi gate. Their guarded installers remain separate from this
 launcher setup and still require explicit mutation acknowledgements, a pinned

@@ -324,6 +324,12 @@ for scenario in log-hash-command-fail log-hash-empty; do
   [[ "$(cat "$STATE")" == "$before" ]]
 done
 set_state 1 1 1 0 0 0 0 0 1
+if output="$(run_theme_helper theme-recovery-broker-before-restore recover-system-theme-runtime 2>&1)"; then
+  echo "theme recovery restored while a new broker was live" >&2; exit 1
+fi
+[[ "$output" == *"broker is still running"* ]]
+[[ "$(cat "$STATE")" == *"runtime=1"*"running=1"*"theme_snapshot=1"* ]]
+set_state 1 1 1 0 0 0 0 0 1
 if output="$(run_theme_helper theme-recovery-broker-appeared recover-system-theme-runtime 2>&1)"; then
   echo "theme recovery accepted a newly live broker" >&2; exit 1
 fi

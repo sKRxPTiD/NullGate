@@ -30,6 +30,10 @@ theme receipts and broker logs, and a broker appearing during theme restoration.
 Unavailable hashes leave simulated device state unchanged. A newly live broker
 blocks receipt removal and leaves runtime evidence present.
 
+Recovery checks broker absence again after downloading the receipt and before
+writing the theme setting. A simulated broker appearing during that transfer
+is rejected before restoration, with the runtime and receipt retained.
+
 Process inventory now has a 15-second timeout with a 2-second termination
 grace period. A simulated stalled ADB inventory reports UNKNOWN within the
 bound and leaves runtime state unchanged. Other ADB operations retain their
@@ -70,7 +74,7 @@ before and after:
 ADB returned to the ordinary shell, and the installed launcher's read-only
 doctor passed all app identities and the absent-runtime check. No APK was
 installed and no theme lease was requested. The user must switch the Rooted
-debugging toggle off separately.
+debugging toggle off separately. Wolf subsequently confirmed it was off.
 
 This validates live broker-log hashing and cleanup. Theme snapshot transfer,
 archival and concurrent-change failure paths remain covered by simulation;

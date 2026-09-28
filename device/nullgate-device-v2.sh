@@ -539,6 +539,7 @@ recover_system_theme_runtime() {
     || { rm -rf -- "$temp_dir"; die "theme recovery receipt transfer hash mismatch; restoration refused"; }
   kind="$(sed -n '1p' "$receipt")"
   snapshot="$(sed '1d' "$receipt")"
+  require_no_broker
   if [[ "$kind" == NULL && -z "$snapshot" ]]; then
     adb_device shell "cmd settings delete secure theme_customization_overlay_packages" >/dev/null || { rm -rf -- "$temp_dir"; die "theme deletion recovery failed"; }
     current="$(adb_device shell settings get secure theme_customization_overlay_packages | tr -d '\r')"

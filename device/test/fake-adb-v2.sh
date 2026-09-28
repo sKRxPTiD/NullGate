@@ -38,6 +38,9 @@ if [[ "${1:-}" == pull ]]; then
     else
       printf 'VALUE\n{"android.theme.customization.color_source":"home_wallpaper"}\n' > "$3"
     fi
+    if [[ "$scenario" == theme-recovery-broker-before-restore ]]; then
+      running=1; save
+    fi
     exit 0
   fi
   [[ "$installed" == 1 || "$test_client" == 1 || "${2:-}" == */broker.log ]] || exit 1
