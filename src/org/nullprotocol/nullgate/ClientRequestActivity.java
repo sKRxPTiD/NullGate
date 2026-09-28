@@ -648,8 +648,7 @@ public final class ClientRequestActivity extends Activity {
     private SharedPreferences store() { return getSharedPreferences(STORE, MODE_PRIVATE); }
 
     private String clientName() {
-        return ExternalClientPolicy.TEST_CLIENT_PACKAGE.equals(approved.clientPackage)
-                ? "NullGate Test Client" : "ColorBlendr";
+        return ExternalClientRegistry.require(approved.clientPackage).displayName;
     }
 
     private String soleSignerDigest(String packageName) throws Exception {

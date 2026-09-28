@@ -4,6 +4,7 @@ public final class ExternalClientPolicyTest {
     private static final String PACKAGE = ExternalClientPolicy.COLORBLENDR_PACKAGE;
     private static final String SIGNER = ExternalClientPolicy.COLORBLENDR_SIGNER;
     private static final String TEST_PACKAGE = ExternalClientPolicy.TEST_CLIENT_PACKAGE;
+    private static final String THEME_PACKAGE = ExternalClientPolicy.THEME_CLIENT_PACKAGE;
     private static final String CONTROLLER_SIGNER =
             "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
 
@@ -33,8 +34,10 @@ public final class ExternalClientPolicyTest {
                 new String[]{SIGNER}, 0xff76543a, "TONAL_SPOT", 600_001));
         exactSchemasRejectMissingAndAdditionalFields();
         registryScopesClientsToNamedCapabilities();
+        registryOwnsReviewedDisplayNames();
         revokeIdentityUsesTheSamePin();
         allowsPairedFirstPartyTestClient();
+        allowsPairedFirstPartyThemeClient();
         denies(() -> testRequest(null, CONTROLLER_SIGNER, 1));
         denies(() -> testRequest(repeat('0', 64), CONTROLLER_SIGNER, 1));
         denies(() -> testRequest(CONTROLLER_SIGNER, null, 1));
@@ -42,7 +45,7 @@ public final class ExternalClientPolicyTest {
         denies(() -> ExternalClientPolicy.authorizeClient(1, true, 10258, PACKAGE,
                 ExternalClientPolicy.COLORBLENDR_VERSION_CODE + 1,
                 new String[]{PACKAGE}, new String[]{SIGNER}));
-        System.out.println("NullGate external-client policy tests: 26 passed");
+        System.out.println("NullGate external-client policy tests: 33 passed");
     }
 
     private static void revokeIdentityUsesTheSamePin() {
@@ -72,9 +75,18 @@ public final class ExternalClientPolicyTest {
     private static void registryScopesClientsToNamedCapabilities() {
         ExternalClientRegistry.requireCapability(PACKAGE, "SYSTEM_THEME_SEED_APPLY");
         ExternalClientRegistry.requireCapability(TEST_PACKAGE, "SYSTEM_THEME_SEED_APPLY");
+        ExternalClientRegistry.requireCapability(THEME_PACKAGE, "SYSTEM_THEME_SEED_APPLY");
         denies(() -> ExternalClientRegistry.requireCapability(PACKAGE, "GENERAL_SHELL"));
         denies(() -> ExternalClientRegistry.requireCapability(
                 "org.nullprotocol.unreviewed", "SYSTEM_THEME_SEED_APPLY"));
+    }
+
+    private static void registryOwnsReviewedDisplayNames() {
+        check("ColorBlendr".equals(ExternalClientRegistry.require(PACKAGE).displayName));
+        check("NullGate Test Client".equals(
+                ExternalClientRegistry.require(TEST_PACKAGE).displayName));
+        check("NullGate Theme Client".equals(
+                ExternalClientRegistry.require(THEME_PACKAGE).displayName));
     }
 
     private static void allowsPinnedTypedRequest() {
@@ -91,6 +103,24 @@ public final class ExternalClientPolicyTest {
         ExternalClientPolicy.ApprovedThemeRequest approved =
                 testRequest(CONTROLLER_SIGNER, colonizedUpper(CONTROLLER_SIGNER), 1);
         check(TEST_PACKAGE.equals(approved.clientPackage));
+    }
+
+    private static void allowsPairedFirstPartyThemeClient() {
+        ExternalClientPolicy.ApprovedThemeRequest approved =
+                ExternalClientPolicy.authorizeThemeRequest(1, true, 10260,
+                        THEME_PACKAGE, ExternalClientPolicy.THEME_CLIENT_VERSION_CODE,
+                        new String[]{THEME_PACKAGE},
+                        new String[]{colonizedUpper(CONTROLLER_SIGNER)},
+                        CONTROLLER_SIGNER, 0xff204f46, "EXPRESSIVE", 120_000);
+        check(THEME_PACKAGE.equals(approved.clientPackage));
+        denies(() -> ExternalClientPolicy.authorizeThemeRequest(1, true, 10260,
+                THEME_PACKAGE, ExternalClientPolicy.THEME_CLIENT_VERSION_CODE,
+                new String[]{THEME_PACKAGE}, new String[]{repeat('0', 64)},
+                CONTROLLER_SIGNER, 0xff204f46, "EXPRESSIVE", 120_000));
+        denies(() -> ExternalClientPolicy.authorizeThemeRequest(1, true, 10260,
+                THEME_PACKAGE, ExternalClientPolicy.THEME_CLIENT_VERSION_CODE + 1,
+                new String[]{THEME_PACKAGE}, new String[]{CONTROLLER_SIGNER},
+                CONTROLLER_SIGNER, 0xff204f46, "EXPRESSIVE", 120_000));
     }
 
     private static ExternalClientPolicy.ApprovedThemeRequest testRequest(

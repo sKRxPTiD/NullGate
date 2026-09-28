@@ -77,6 +77,12 @@ The controller now contains the first implementation slice:
 - persisted uncertain-outcome recovery and caller-bound revocation;
 - a standalone signer-pinning reference client under `client/reference/`.
 
+The second first-party package, `org.nullprotocol.nullgate.themeclient`, reuses
+the same exact protocol and lifecycle policy with selectable closed theme
+presets. Its registry entry supplies its reviewed display name and paired signer
+policy; the approval UI no longer assumes every non-test client is ColorBlendr.
+It remains host-only until a separate device gate is reviewed.
+
 The client reference compiles during every NullGate build. A host-only upstream
 ColorBlendr patch now implements the work method, foreground result flow,
 signer-pinned controller verification, revoke-before-replace, and explicit

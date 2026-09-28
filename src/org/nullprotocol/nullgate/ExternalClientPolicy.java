@@ -13,6 +13,9 @@ public final class ExternalClientPolicy {
     public static final String TEST_CLIENT_PACKAGE =
             "org.nullprotocol.nullgate.testclient";
     public static final long TEST_CLIENT_VERSION_CODE = 1L;
+    public static final String THEME_CLIENT_PACKAGE =
+            "org.nullprotocol.nullgate.themeclient";
+    public static final long THEME_CLIENT_VERSION_CODE = 1L;
 
     public static final class ApprovedThemeRequest {
         public final String clientPackage;

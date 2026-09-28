@@ -13,14 +13,17 @@ final class ExternalClientRegistry {
 
     static final class Registration {
         final String packageName;
+        final String displayName;
         final long versionCode;
         private final String fixedSigner;
         private final boolean signerPairedToController;
         private final Set<Capability> capabilities;
 
-        private Registration(String packageName, long versionCode, String fixedSigner,
-                boolean signerPairedToController, Set<Capability> capabilities) {
+        private Registration(String packageName, String displayName, long versionCode,
+                String fixedSigner, boolean signerPairedToController,
+                Set<Capability> capabilities) {
             this.packageName = packageName;
+            this.displayName = displayName;
             this.versionCode = versionCode;
             this.fixedSigner = fixedSigner;
             this.signerPairedToController = signerPairedToController;
@@ -42,12 +45,19 @@ final class ExternalClientRegistry {
         Map<String, Registration> clients = new HashMap<>();
         register(clients, fixed(
                 ExternalClientPolicy.COLORBLENDR_PACKAGE,
+                "ColorBlendr",
                 ExternalClientPolicy.COLORBLENDR_VERSION_CODE,
                 ExternalClientPolicy.COLORBLENDR_SIGNER,
                 Capability.SYSTEM_THEME_SEED_APPLY));
         register(clients, paired(
                 ExternalClientPolicy.TEST_CLIENT_PACKAGE,
+                "NullGate Test Client",
                 ExternalClientPolicy.TEST_CLIENT_VERSION_CODE,
+                Capability.SYSTEM_THEME_SEED_APPLY));
+        register(clients, paired(
+                ExternalClientPolicy.THEME_CLIENT_PACKAGE,
+                "NullGate Theme Client",
+                ExternalClientPolicy.THEME_CLIENT_VERSION_CODE,
                 Capability.SYSTEM_THEME_SEED_APPLY));
         CLIENTS = Collections.unmodifiableMap(clients);
     }
@@ -77,17 +87,17 @@ final class ExternalClientRegistry {
         return normalized.matches("[0-9a-f]{64}") ? normalized : "";
     }
 
-    private static Registration fixed(String packageName, long versionCode,
-            String signer, Capability... capabilities) {
+    private static Registration fixed(String packageName, String displayName,
+            long versionCode, String signer, Capability... capabilities) {
         String normalized = normalizeDigest(signer);
         if (normalized.isEmpty()) throw new IllegalArgumentException("invalid fixed signer");
-        return new Registration(packageName, versionCode, normalized, false,
+        return new Registration(packageName, displayName, versionCode, normalized, false,
                 capabilitySet(capabilities));
     }
 
-    private static Registration paired(String packageName, long versionCode,
-            Capability... capabilities) {
-        return new Registration(packageName, versionCode, "", true,
+    private static Registration paired(String packageName, String displayName,
+            long versionCode, Capability... capabilities) {
+        return new Registration(packageName, displayName, versionCode, "", true,
                 capabilitySet(capabilities));
     }
 
@@ -103,6 +113,7 @@ final class ExternalClientRegistry {
             Registration registration) {
         if (registration.packageName == null
                 || !registration.packageName.matches("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+")
+                || registration.displayName == null || registration.displayName.trim().isEmpty()
                 || registration.versionCode <= 0
                 || clients.put(registration.packageName, registration) != null)
             throw new IllegalArgumentException("invalid or duplicate client registration");

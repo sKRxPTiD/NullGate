@@ -22,10 +22,11 @@ build_code="$(one_value "$(sed -n 's/^verify_manifest_identity .* org\.nullproto
 helper_code="$(one_value "$(sed -n 's/^CONTROLLER_VERSION_CODE="\([0-9][0-9]*\)"$/\1/p' "$HELPER")" "device-helper version pin")"
 private_code="$(one_value "$(sed -n 's/^controller\.versionCode=\([0-9][0-9]*\)$/\1/p' "$PINS")" "private launcher version pin")"
 
-[[ "$manifest_code" == "$build_code" && "$manifest_code" == "$helper_code" \
-  && "$manifest_code" == "$private_code" ]] \
-  || die "controller version mismatch: manifest=$manifest_code build=$build_code helper=$helper_code private=$private_code"
-[[ "$manifest_name" == "0.1.0" ]] || die "unexpected release name: $manifest_name"
+[[ "$manifest_code" == "$build_code" && "$manifest_code" == "$helper_code" ]] \
+  || die "source version mismatch: manifest=$manifest_code build=$build_code helper=$helper_code"
+(( private_code <= manifest_code )) \
+  || die "deployed private baseline cannot be newer than active source: private=$private_code source=$manifest_code"
+[[ "$manifest_name" == "0.2.0" ]] || die "unexpected source version name: $manifest_name"
 [[ "$manifest_label" == "NullGate" ]] || die "unexpected application label: $manifest_label"
 
 if [[ "${1:-}" == --with-apk ]]; then
@@ -39,4 +40,4 @@ if [[ "${1:-}" == --with-apk ]]; then
     || die "built APK identity does not match the reviewed release metadata"
 fi
 
-echo "NullGate release metadata consistent: $manifest_name (code $manifest_code)"
+echo "NullGate source metadata consistent: $manifest_name (code $manifest_code); PiXi baseline code $private_code"

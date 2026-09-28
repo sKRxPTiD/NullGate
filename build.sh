@@ -125,12 +125,14 @@ fi
 
 bash "$BASE_DIR/client/test.sh"
 bash "$BASE_DIR/test-client/test.sh"
+bash "$BASE_DIR/theme-client/test.sh"
 bash "$BASE_DIR/broker/test.sh"
 
 rm -rf "$OUT_DIR" "$DIST_DIR"
 mkdir -p "$OUT_DIR/compiled-res" "$OUT_DIR/classes" "$OUT_DIR/dex" "$OUT_DIR/broker-classes" \
   "$OUT_DIR/broker-dex" "$OUT_DIR/client-reference" "$OUT_DIR/test-client-classes" \
-  "$OUT_DIR/test-client-dex" "$DIST_DIR" "$KEY_DIR"
+  "$OUT_DIR/test-client-dex" "$OUT_DIR/theme-client-classes" \
+  "$OUT_DIR/theme-client-dex" "$DIST_DIR" "$KEY_DIR"
 
 "$BUILD_TOOLS/aapt2" compile --dir "$BASE_DIR/res" -o "$OUT_DIR/compiled-res"
 "$BUILD_TOOLS/aapt2" link --manifest "$BASE_DIR/AndroidManifest.xml" \
@@ -163,6 +165,20 @@ mapfile -d '' -t test_client_classes < <(find "$OUT_DIR/test-client-classes" -na
   "${test_client_classes[@]}"
 (cd "$OUT_DIR/test-client-dex" && zip -q -j "$OUT_DIR/test-client-base.apk" classes.dex)
 
+# Build the paired first-party theme client as a distinct package and UID.
+"$BUILD_TOOLS/aapt2" link --manifest "$BASE_DIR/theme-client/AndroidManifest.xml" \
+  -I "$ANDROID_JAR" --min-sdk-version 26 --target-sdk-version 36 \
+  -o "$OUT_DIR/theme-client-base.apk"
+javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/theme-client-classes" \
+  "$BASE_DIR/common/src/org/nullprotocol/nullgate/protocol/ExternalClientContract.java" \
+  "$BASE_DIR/common/src/org/nullprotocol/nullgate/protocol/ExternalResultPolicy.java" \
+  "$BASE_DIR/theme-client/src/org/nullprotocol/nullgate/themeclient/MainActivity.java" \
+  "$BASE_DIR/theme-client/src/org/nullprotocol/nullgate/themeclient/ThemeClientStatePolicy.java"
+mapfile -d '' -t theme_client_classes < <(find "$OUT_DIR/theme-client-classes" -name '*.class' -print0)
+"$BUILD_TOOLS/d8" --min-api 26 --lib "$ANDROID_JAR" --output "$OUT_DIR/theme-client-dex" \
+  "${theme_client_classes[@]}"
+(cd "$OUT_DIR/theme-client-dex" && zip -q -j "$OUT_DIR/theme-client-base.apk" classes.dex)
+
 "$BUILD_TOOLS/zipalign" -f 4 "$OUT_DIR/base.apk" "$OUT_DIR/aligned.apk"
 "$BUILD_TOOLS/apksigner" sign --ks "$KEYSTORE" --ks-key-alias nullgate-local \
   --ks-pass "file:$KEYPASS_FILE" \
@@ -176,14 +192,22 @@ mapfile -d '' -t test_client_classes < <(find "$OUT_DIR/test-client-classes" -na
   --out "$DIST_DIR/NullGate-test-client-debug.apk" "$OUT_DIR/test-client-aligned.apk"
 "$BUILD_TOOLS/apksigner" verify --verbose "$DIST_DIR/NullGate-test-client-debug.apk"
 
+"$BUILD_TOOLS/zipalign" -f 4 "$OUT_DIR/theme-client-base.apk" \
+  "$OUT_DIR/theme-client-aligned.apk"
+"$BUILD_TOOLS/apksigner" sign --ks "$KEYSTORE" --ks-key-alias nullgate-local \
+  --ks-pass "file:$KEYPASS_FILE" \
+  --out "$DIST_DIR/NullGate-theme-client-debug.apk" "$OUT_DIR/theme-client-aligned.apk"
+"$BUILD_TOOLS/apksigner" verify --verbose "$DIST_DIR/NullGate-theme-client-debug.apk"
+
 verify_manifest_identity() {
   local apk="$1" expected_package="$2" expected_version="$3" badging
   badging="$("$BUILD_TOOLS/aapt2" dump badging "$apk" | sed -n '1p')"
   [[ "$badging" == *"name='$expected_package'"* && "$badging" == *"versionCode='$expected_version'"* ]] || { echo "Unexpected packaged identity: $apk" >&2; exit 1; }
   "$BUILD_TOOLS/aapt2" dump permissions "$apk" | grep -Fqx "uses-permission: name='android.permission.HIDE_OVERLAY_WINDOWS'" || { echo "Overlay protection permission missing: $apk" >&2; exit 1; }
 }
-verify_manifest_identity "$DIST_DIR/NullGate-prototype-debug.apk" org.nullprotocol.nullgate 2
+verify_manifest_identity "$DIST_DIR/NullGate-prototype-debug.apk" org.nullprotocol.nullgate 3
 verify_manifest_identity "$DIST_DIR/NullGate-test-client-debug.apk" org.nullprotocol.nullgate.testclient 1
+verify_manifest_identity "$DIST_DIR/NullGate-theme-client-debug.apk" org.nullprotocol.nullgate.themeclient 1
 bash "$BASE_DIR/release/check-release-metadata.sh" --with-apk
 
 mapfile -d '' -t broker_sources < <(find "$BASE_DIR/common/src" "$BASE_DIR/broker/src" "$BASE_DIR/broker/android" -name '*.java' -print0)
@@ -196,10 +220,11 @@ mapfile -d '' -t broker_classes < <(find "$OUT_DIR/broker-classes" -name '*.clas
 "$BUILD_TOOLS/apksigner" verify --print-certs "$DIST_DIR/NullGate-prototype-debug.apk" \
   | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' > "$DIST_DIR/controller-cert-sha256.txt"
 (cd "$DIST_DIR" && sha256sum NullGate-prototype-debug.apk NullGate-test-client-debug.apk \
-  NullGate-broker.jar \
+  NullGate-theme-client-debug.apk NullGate-broker.jar \
   controller-cert-sha256.txt > SHA256SUMS)
 echo "Built: $DIST_DIR/NullGate-prototype-debug.apk"
 echo "Built: $DIST_DIR/NullGate-test-client-debug.apk"
+echo "Built: $DIST_DIR/NullGate-theme-client-debug.apk"
 echo "Built: $DIST_DIR/NullGate-broker.jar"
 if ((RUN_DEVICE_HARNESS)); then
   bash "$BASE_DIR/device/test.sh"

@@ -2,9 +2,12 @@
 set -euo pipefail
 [[ "${1:-}" == dump && "${2:-}" == badging && -n "${3:-}" ]] || exit 64
 package=org.nullprotocol.nullgate
-version=2
+version=3
 if [[ "$3" == *NullGate-test-client-debug.apk ]]; then
   package=org.nullprotocol.nullgate.testclient
+  version=1
+elif [[ "$3" == *NullGate-theme-client-debug.apk ]]; then
+  package=org.nullprotocol.nullgate.themeclient
   version=1
 fi
 [[ "${FAKE_SCENARIO:-}" == wrong-local-package ]] && package=org.nullprotocol.impostor

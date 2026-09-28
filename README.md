@@ -36,8 +36,9 @@ Lost replies, restart and unknown broker records are not presented as no root.
 The local log is bounded to 16 KiB; it is not a tamper-proof audit ledger.
 A marker is a lifecycle test, not proof of reversible privilege in other apps.
 
-The current PiXi controller is NullGate 0.1.0 (version code 2). See `STATUS.md`
-for the concise completed-versus-remaining product boundary.
+The current verified PiXi controller remains NullGate 0.1.0 (version code 2).
+Active source is the host-only 0.2.0 development line (version code 3). See
+`STATUS.md` for the concise completed-versus-remaining product boundary.
 
 ## Build and tests
 
@@ -146,17 +147,22 @@ The official installation attempt failed before changing the device.
 The product path is now explicitly self-contained: typed NullGate capabilities
 and an integration contract for clients. Shizuku is optional, not required.
 
-The controller now exposes a first typed client request/revoke Activity for the
-reviewed ColorBlendr 3.0.1 package and a separate first-party NullGate Test
-Client. A closed client registry keeps package, version, signer source, and
-allowed capability together instead of embedding ColorBlendr-specific trust
-branches in the request parser. It requires a result-bound Android caller, pins
-package, sole UID ownership, version code and signer, rejects additional intent fields, shows an
+The controller exposes a typed client request/revoke Activity for the reviewed
+ColorBlendr 3.0.1 package, the first-party NullGate Test Client, and a second
+first-party NullGate Theme Client. The theme client offers closed palette/style
+choices through the same bounded capability; it is not a shell or arbitrary
+settings interface. A closed client registry keeps package, display name,
+version, signer source, and allowed capability together instead of embedding
+client-specific trust branches in the request parser. It requires a result-bound
+Android caller, pins package, sole UID ownership, version code and signer,
+rejects additional intent fields, shows an
 obscured-touch-protected approval screen, persists uncertain outcomes, and
-binds revoke to the original caller. The test client is a distinct package and
-UID, is signed with the controller's local development identity, and receives
-only a lease receipt. A signer-pinning reference client compiles with every
-build. A direct ADB-shell spoof attempt on PiXi was denied with no broker
+binds revoke to the original caller. Both first-party clients are distinct
+packages and UIDs, are signed with the controller's selected identity, and
+receive only lease receipts. A signer-pinning reference client compiles with every
+build. The 0.2.0 controller and theme-client signed host build and simulated
+device-helper suite pass; they remain off-device. A direct ADB-shell spoof
+attempt on PiXi was denied with no broker
 runtime and ADB remaining non-root. The matching ColorBlendr client patch now
 builds off-device, rejects malformed or ambiguous Activity results, and
 reconciles interrupted grant/revoke operations instead of treating them as
@@ -164,7 +170,7 @@ clean. Its policy unit tests pass and the upstream-oriented patch series is
 exported under `integrations/patches/`. On this private branch, PiXi now runs
 the pinned `v3.0.1-nullgate.1` fork and its live lease lifecycle passed.
 Upstream adoption under the official signer remains a separate public path.
-See `CLIENT_INTEGRATION.md` and `TEST_CLIENT.md`.
+See `CLIENT_INTEGRATION.md`, `TEST_CLIENT.md`, and `THEME_CLIENT.md`.
 
 Protocol v2 and the first native adapter are now implemented off-device. The
 typed `SYSTEM_THEME_SEED_APPLY` capability accepts only an opaque color and an
@@ -200,6 +206,7 @@ passed on-device. This path does not require Shizuku.
 - `BROKER_CONTRACT.md` defines the root-side protocol and invariants.
 - `CLIENT_INTEGRATION.md` defines the Android caller contract.
 - `TEST_CLIENT.md` defines the first-party external-app harness and limits.
+- `THEME_CLIENT.md` defines the second first-party typed client and its gate.
 - `DEPLOYMENT_GATE.md` defines the supervised PiXi test and stop conditions.
 - `NATIVE_CAPABILITY_CONTRACT.md` defines the first typed native capability.
 - `THREAT_MODEL.md` and `SECURITY_AUDIT.md` record the current security boundary.
