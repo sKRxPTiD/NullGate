@@ -67,3 +67,21 @@ reconciliation reported: `Reconciled clean: no active theme lease remains.`
 - ADB was returned to UID 2000 (`u:r:shell:s0`) with SELinux Enforcing.
 - Rooted debugging was switched off by the operator after ADB returned to UID
   2000. SELinux remained Enforcing and no managed broker runtime remained.
+
+## Hardened-client follow-up
+
+The subsequent lifecycle-UX fix was installed and revalidated in a separate
+supervised window. The prior installed theme-client APK was archived with
+SHA-256
+`8693168fe64c17ac6c4bb1ec30877f77c9f4b96eeeff5eebd42f52e963f8e1a0`.
+The replacement was pulled back byte-for-byte with SHA-256
+`20c55342a64774c96da6bddd9af80ecd0cc5f3ce316861c12e0a2419cc9f5db2`
+and retained the pinned first-party signer.
+
+An Ember `#9B3D20` / `EXPRESSIVE` lease confirmed that Android theme-driven
+Activity recreation preserves the submitted palette and style on screen. At
+natural expiry the broker recorded `cleanup=EXPIRED`, restored the exact
+baseline hash, and the recreated client retained Ember/EXPRESSIVE while showing
+`Lease deadline passed; reconcile to confirm restoration.` Reconciliation then
+reported no active lease. Final shutdown confirmed no controller record, zero
+leases, an absent managed runtime, ADB UID 2000 and SELinux Enforcing.

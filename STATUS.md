@@ -65,3 +65,9 @@ client code 1, admitted ColorBlendr code 42001, all expected signers, ordinary
 ADB and an absent managed runtime. Separate launcher actions now open either
 ColorBlendr or the first-party Theme Client through the typed system-theme
 broker.
+
+The hardened Theme Client build was subsequently installed and revalidated on
+PiXi. Its selected palette/style now survive theme-driven Activity recreation,
+and natural expiry displays specific reconciliation guidance without treating
+elapsed local time as cleanup proof. Exact restoration, reconciliation and
+final zero-runtime shutdown passed again.
