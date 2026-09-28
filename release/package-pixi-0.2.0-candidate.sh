@@ -98,7 +98,11 @@ find "$payload" -type f -exec touch -d "@$REPRODUCIBLE_EPOCH" -- {} +
   | zip -X -q "$bundle_tmp" -@)
 
 mkdir -p "$OUTPUT_DIR"
-install -m 0644 "$bundle_tmp" "$OUTPUT_DIR/$BUNDLE_NAME"
+cp -- "$bundle_tmp" "$OUTPUT_DIR/$BUNDLE_NAME"
+chmod 0644 "$OUTPUT_DIR/$BUNDLE_NAME" 2>/dev/null || true
+[[ "$(sha256sum "$bundle_tmp" | awk '{print $1}')" == \
+    "$(sha256sum "$OUTPUT_DIR/$BUNDLE_NAME" | awk '{print $1}')" ]] \
+  || die "candidate bundle hash changed during the final TerraDrive write"
 (cd "$OUTPUT_DIR" && sha256sum "$BUNDLE_NAME" > "$BUNDLE_NAME.sha256")
 
 echo "NullGate candidate staged; immutable releases directory was not touched."
