@@ -93,7 +93,8 @@ require_connected() {
 
 require_no_broker() {
   local processes
-  processes="$(adb_device shell ps -A -o ARGS)" || die "process inventory unavailable; state is UNKNOWN"
+  processes="$(timeout --kill-after=2s 15s "$ADB_BIN" -s "$SERIAL" shell ps -A -o ARGS)" \
+    || die "process inventory unavailable or timed out; state is UNKNOWN"
   [[ -n "$processes" ]] || die "empty process inventory; state is UNKNOWN"
   [[ "$processes" != *"$BROKER_CLASS"* ]] || die "broker is still running; stop before cleanup or deployment"
 }

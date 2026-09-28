@@ -77,6 +77,7 @@ case "$request" in
   "shell pm list packages --user 0 org.nullprotocol.nullgate.themeclient")
     if [[ "$theme_client" == 1 ]]; then echo package:org.nullprotocol.nullgate.themeclient; fi ;;
   "shell ps -A -o ARGS")
+    if [[ "$scenario" == inventory-stall ]]; then sleep 30; fi
     [[ "$scenario" != inventory-fail ]] || exit 1
     echo ARGS
     if [[ "$running" == 1 ]]; then echo org.nullprotocol.nullgate.broker.NullGateBrokerMain; fi ;;

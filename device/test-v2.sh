@@ -329,6 +329,14 @@ if output="$(run_theme_helper theme-recovery-broker-appeared recover-system-them
 fi
 [[ "$output" == *"broker is still running"* ]]
 [[ "$(cat "$STATE")" == *"runtime=1"*"running=1"*"theme_snapshot=1"* ]]
+set_state 1 1 1
+before="$(cat "$STATE")"
+stall_started=$SECONDS
+expect_failure inventory-stall cleanup "timed out; state is UNKNOWN"
+[[ "$(cat "$STATE")" == "$before" ]]
+[[ "$((SECONDS - stall_started))" -lt 25 ]] || {
+  echo "stalled inventory was not bounded" >&2; exit 1;
+}
 set_state 1 1 1 0 0 0 0 0 1
 before="$(cat "$STATE")"
 if output="$(run_theme_helper theme-recovery-transfer-corrupt recover-system-theme-runtime 2>&1)"; then

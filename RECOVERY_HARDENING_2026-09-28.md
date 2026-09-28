@@ -30,6 +30,11 @@ theme receipts and broker logs, and a broker appearing during theme restoration.
 Unavailable hashes leave simulated device state unchanged. A newly live broker
 blocks receipt removal and leaves runtime evidence present.
 
+Process inventory now has a 15-second timeout with a 2-second termination
+grace period. A simulated stalled ADB inventory reports UNKNOWN within the
+bound and leaves runtime state unchanged. Other ADB operations retain their
+existing behavior; this is not a deadline for the entire recovery operation.
+
 A simulated archive-write failure and a copy-corruption regression confirm
 that both failures are rejected and the runtime and theme receipt remain
 present. The existing successful VALUE and NULL restoration scenarios continue
