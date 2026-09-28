@@ -31,7 +31,9 @@ if [[ "${1:-}" == pull ]]; then
     exit 0
   fi
   if [[ "${2:-}" == /data/local/tmp/nullgate/theme.snapshot && "$theme_snapshot" == 1 ]]; then
-    if [[ "$scenario" == theme-recovery-null ]]; then
+    if [[ "$scenario" == theme-recovery-transfer-corrupt ]]; then
+      printf 'VALUE\n{"corrupted":true}\n' > "$3"
+    elif [[ "$scenario" == theme-recovery-null ]]; then
       printf 'NULL\n' > "$3"
     else
       printf 'VALUE\n{"android.theme.customization.color_source":"home_wallpaper"}\n' > "$3"
@@ -207,6 +209,12 @@ case "$request" in
     else printf 'lease=lease_0000000001\nexpiresElapsed=999999\n'; fi ;;
   "shell rm -f /data/local/tmp/nullgate/leases/lease_0000000001.lease")
     leases=0; save ;;
+  "shell sha256sum /data/local/tmp/nullgate/theme.snapshot")
+    if [[ "$scenario" == theme-recovery-null ]]; then
+      printf 'NULL\n' | sha256sum
+    else
+      printf 'VALUE\n{"android.theme.customization.color_source":"home_wallpaper"}\n' | sha256sum
+    fi ;;
   "shell sha256sum /data/local/tmp/nullgate/broker.log")
     printf 'test artifact\n' | sha256sum ;;
   "shell if test -L /data/local/tmp/nullgate/broker.log; then echo SYMLINK; elif test -f /data/local/tmp/nullgate/broker.log; then stat -c 'FILE:%u:%a' /data/local/tmp/nullgate/broker.log; elif test -e /data/local/tmp/nullgate/broker.log; then echo OTHER; else echo ABSENT; fi")

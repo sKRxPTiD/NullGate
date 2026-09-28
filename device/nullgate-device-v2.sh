@@ -514,7 +514,7 @@ recover_system_theme_runtime() {
   platform_preflight
   require_private_runtime
   require_no_broker
-  local pid receipt_state temp_dir receipt kind snapshot current entries entry archived_receipt receipt_hash
+  local pid receipt_state temp_dir receipt kind snapshot current entries entry archived_receipt receipt_hash remote_receipt_hash
   pid="$(validated_stale_pid_receipt)"
   receipt_state="$(adb_device shell "if test -L $DEVICE_DIR/theme.snapshot; then echo SYMLINK; elif test -f $DEVICE_DIR/theme.snapshot; then stat -c 'FILE:%u:%a:%s' $DEVICE_DIR/theme.snapshot; elif test -e $DEVICE_DIR/theme.snapshot; then echo OTHER; else echo ABSENT; fi" | tr -d '\r')"
   [[ "$receipt_state" =~ ^FILE:0:600:([0-9]{1,5})$ ]] || die "theme recovery receipt is absent or unsafe: $receipt_state"
@@ -528,9 +528,14 @@ recover_system_theme_runtime() {
       || die "unexpected runtime entry; refusing theme recovery: $entry"
   done <<< "$entries"
   require_no_broker
+  remote_receipt_hash="$(adb_device shell "sha256sum $DEVICE_DIR/theme.snapshot" | awk '{print $1}' | tr -d '\r')" \
+    || die "could not hash theme recovery receipt"
+  [[ "$remote_receipt_hash" =~ ^[0-9a-f]{64}$ ]] || die "invalid theme recovery receipt hash"
   temp_dir="$(mktemp -d)"
   receipt="$temp_dir/theme.snapshot"
   adb_device pull "$DEVICE_DIR/theme.snapshot" "$receipt" >/dev/null || { rm -rf -- "$temp_dir"; die "could not preserve theme recovery receipt"; }
+  [[ "$(sha256sum "$receipt" | awk '{print $1}')" == "$remote_receipt_hash" ]] \
+    || { rm -rf -- "$temp_dir"; die "theme recovery receipt transfer hash mismatch; restoration refused"; }
   kind="$(sed -n '1p' "$receipt")"
   snapshot="$(sed '1d' "$receipt")"
   if [[ "$kind" == NULL && -z "$snapshot" ]]; then

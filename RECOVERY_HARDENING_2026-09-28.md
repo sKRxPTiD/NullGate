@@ -16,6 +16,10 @@ device SHA-256 and verifies the downloaded log against it before deleting the
 runtime. A simulated corrupt transfer confirms cleanup aborts with the runtime
 unchanged. Transfer or hash failures require inspection or a retry.
 
+Theme receipt downloads are also checked against a valid device SHA-256 before
+parsing or restoring the theme. A corrupted transfer containing valid JSON is
+rejected before restoration; the simulated device state remains unchanged.
+
 A simulated archive-write failure and a copy-corruption regression confirm
 that both failures are rejected and the runtime and theme receipt remain present. The existing
 successful VALUE and NULL restoration scenarios continue to pass.
