@@ -18,7 +18,7 @@ helper_read() {
   case "$*" in
     preflight) return 0 ;;
     verify-clean)
-      [[ "$scenario" != broker-present ]] || { printf 'broker still running\n'; return 1; } ;;
+      [[ "$scenario" != broker-present && "$scenario" != recovery-verification-failed ]] || { printf 'broker still running\n'; return 1; } ;;
     *) return 64 ;;
   esac
 }
@@ -78,4 +78,27 @@ output="$(start_colorblendr_session 2>&1)"
 [[ "$(sed -n '3p' "$test_log")" == colorblendr ]] || exit 1
 [[ "$(wc -l < "$test_log" | tr -d '[:space:]')" == 3 ]] || exit 1
 
-printf 'NullGate launcher regressions: 8 passed (simulated ADB only)\n'
+NULLGATE_NO_DIALOG=1
+helper_theme() {
+  [[ "$scenario" == recovery-verification-failed ]] && return 0
+  printf 'recovery refused\n'; return 1
+}
+adb_pixi() {
+  case "$*" in
+    'shell if test -L /data/local/tmp/nullgate/theme.snapshot; then echo SYMLINK; elif test -f /data/local/tmp/nullgate/theme.snapshot; then echo FILE; elif test -e /data/local/tmp/nullgate/theme.snapshot; then echo OTHER; else echo ABSENT; fi')
+      if [[ "$scenario" == recovery-unsafe ]]; then echo SYMLINK; else echo FILE; fi ;;
+    unroot) printf 'unroot\n' >> "$test_log" ;;
+    'shell id') printf 'uid=2000(shell)\n' ;;
+    *) return 64 ;;
+  esac
+}
+for scenario in recovery-refused recovery-unsafe recovery-verification-failed; do
+  : > "$test_log"
+  if output="$(recover_runtime 2>&1)"; then
+    printf 'Launcher falsely accepted %s\n' "$scenario" >&2; exit 1
+  fi
+  [[ "$output" != *SUCCESS:* ]]
+  [[ "$(cat "$test_log")" == unroot ]]
+done
+
+printf 'NullGate launcher regressions: 11 passed (simulated ADB only)\n'

@@ -18,11 +18,12 @@ It rechecks broker absence before restoration and receipt deletion, rechecks
 receipt identity before deletion, and bounds process inventory to 15 seconds
 with a 2-second termination grace period.
 
-The full simulated helper suite and eight launcher regressions pass. Tests
+The full simulated helper suite and eleven launcher regressions pass. Tests
 cover corrupted transfers, archive write/corruption failures, empty or failed
 hash commands, changed receipts, broker appearance and stalled inventory.
 Launcher setup validation passes. The installed launcher calls the active
-source helper directly; no reinstall was needed. Details and limits are in
+source helper directly. It was later refreshed for the failure-path unroot
+fix, with the installed copy verified against source. Details and limits are in
 `RECOVERY_HARDENING_2026-09-28.md`.
 
 ## Device and release state

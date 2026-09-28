@@ -331,13 +331,18 @@ recover_runtime() {
   case "$snapshot_state" in
     FILE) output="$(helper_theme recover-system-theme-runtime 2>&1)" ;;
     ABSENT) output="$(helper_write recover-marker-runtime 2>&1)" ;;
-    *) fail "Recovery refused an unsafe theme-snapshot state: $snapshot_state"; return 1 ;;
+    *)
+      fail "Recovery refused an unsafe theme-snapshot state: $snapshot_state"
+      deactivate_root || return 1
+      return 1 ;;
   esac || {
     fail "Recovery refused the current state. Evidence remains untouched.\n\n$output"
+    deactivate_root || return 1
     return 1
   }
   output="$(helper_read verify-clean 2>&1)" || {
     fail "Recovery ran, but final verification failed.\n\n$output"
+    deactivate_root || return 1
     return 1
   }
   deactivate_root || return 1

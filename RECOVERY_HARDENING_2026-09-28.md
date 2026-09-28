@@ -51,10 +51,14 @@ Validation: shell syntax, the full simulated v2 device-helper suite, launcher
 tests and Git whitespace checks. All device interactions in these suites use
 test doubles; no live phone operation or APK build was performed.
 
-The installed DoloWOLF launcher matches the tracked launcher byte-for-byte and
-calls `source/device/nullgate-device-v2.sh` directly. It therefore uses this
-updated helper without reinstallation. This wiring was inspected without
-contacting PiXi.
+The installed DoloWOLF launcher calls `source/device/nullgate-device-v2.sh`
+directly, so helper changes require no reinstall. A subsequent launcher fix
+returns ADB to the ordinary shell when recovery refuses an unsafe receipt,
+the helper fails, or final verification fails. Recovery still reports failure
+and preserves remaining runtime evidence. Eleven simulated launcher checks
+pass. The installed launcher was refreshed to this tracked version after
+verifying its previous bytes; the refreshed copy matches source. These new
+failure paths have not been exercised live on PiXi.
 
 The preserved RC1 bundle does not include this follow-up change. Its existing
 validation records remain applicable to its bytes. Live validation of this
