@@ -208,6 +208,7 @@ passed on-device. This path does not require Shizuku.
 - `TEST_CLIENT.md` defines the first-party external-app harness and limits.
 - `THEME_CLIENT.md` defines the second first-party typed client and its gate.
 - `DEPLOYMENT_GATE.md` defines the supervised PiXi test and stop conditions.
+- `INSTALL_AND_ONBOARD.md` covers DoloWOLF launcher setup and the first read-only check.
 - `NATIVE_CAPABILITY_CONTRACT.md` defines the first typed native capability.
 - `THREAT_MODEL.md` and `SECURITY_AUDIT.md` record the current security boundary.
 - `integrations/patches/` contains the reviewed ColorBlendr integration patch.

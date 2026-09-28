@@ -72,6 +72,9 @@ The desktop launcher and command both use the same guarded implementation.
 Its tracked source is `device/nullgate-pixi`. Reinstall or repair the DoloWOLF
 launcher with `device/install-dolowolf-launcher.sh`.
 
+For prerequisites, the no-write setup check, installation paths, and first
+read-only connection check, see `INSTALL_AND_ONBOARD.md`.
+
 **Run read-only health check** (or `nullgate-pixi doctor`) verifies ordinary
 ADB, the installed package versions and signing certificates, and an absent
 runtime. It does not enable root or write to PiXi.

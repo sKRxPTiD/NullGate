@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-SERIAL="54110DLAQ0043W"
+SERIAL="${NULLGATE_SERIAL:-54110DLAQ0043W}"
 PROJECT="/mnt/TerraDrive/Null Protocol/Apps/NullGate/source"
 HELPER="$PROJECT/device/nullgate-device-v2.sh"
 TOKEN="NULLGATE_MARKER_TEST_V1"
@@ -9,7 +9,10 @@ THEME_TOKEN="NULLGATE_SYSTEM_THEME_V1"
 PACKAGE="org.nullprotocol.nullgate"
 COLORBLENDR_PACKAGE="com.drdisagree.colorblendr"
 RUNTIME="/data/local/tmp/nullgate"
-APKSIGNER="/home/wolf/Android/Sdk/build-tools/36.0.0/apksigner"
+ADB_BIN="${ADB_BIN:-adb}"
+ANDROID_SDK="${ANDROID_HOME:-$HOME/Android/Sdk}"
+APKSIGNER="${APKSIGNER_BIN:-$ANDROID_SDK/build-tools/36.0.0/apksigner}"
+AAPT2="${AAPT2_BIN:-$ANDROID_SDK/build-tools/36.0.0/aapt2}"
 PRIVATE_PINS="$PROJECT/compat/pixi-private-pins.properties"
 
 info() {
@@ -33,18 +36,21 @@ fail() {
   return 1
 }
 
-adb_pixi() { adb -s "$SERIAL" "$@"; }
+adb_pixi() { "$ADB_BIN" -s "$SERIAL" "$@"; }
 
 helper_read() {
-  NULLGATE_SERIAL="$SERIAL" "$HELPER" "$@"
+  NULLGATE_SERIAL="$SERIAL" ADB_BIN="$ADB_BIN" APKSIGNER_BIN="$APKSIGNER" \
+    AAPT2_BIN="$AAPT2" "$HELPER" "$@"
 }
 
 helper_write() {
-  NULLGATE_SERIAL="$SERIAL" NULLGATE_MUTATION_TOKEN="$TOKEN" "$HELPER" "$@"
+  NULLGATE_SERIAL="$SERIAL" NULLGATE_MUTATION_TOKEN="$TOKEN" ADB_BIN="$ADB_BIN" \
+    APKSIGNER_BIN="$APKSIGNER" AAPT2_BIN="$AAPT2" "$HELPER" "$@"
 }
 
 helper_theme() {
-  NULLGATE_SERIAL="$SERIAL" NULLGATE_MUTATION_TOKEN="$THEME_TOKEN" "$HELPER" "$@"
+  NULLGATE_SERIAL="$SERIAL" NULLGATE_MUTATION_TOKEN="$THEME_TOKEN" ADB_BIN="$ADB_BIN" \
+    APKSIGNER_BIN="$APKSIGNER" AAPT2_BIN="$AAPT2" "$HELPER" "$@"
 }
 
 require_connection() {
@@ -274,15 +280,33 @@ recover_runtime() {
 menu() {
   while true; do
     local choice
-    choice="$(zenity --list --title="NullGate · PiXi" --width=620 --height=380 \
-      --text="PiXi must be plugged in and unlocked. Enable Rooted debugging before Start, Stop, or Recovery." \
-      --column="Action" --column="What it does" \
-      "Start ColorBlendr NullGate session" "Verify PiXi and launch the temporary theme broker" \
-      "Stop and clean session" "Revoke/stop, archive the log, remove runtime, unroot ADB" \
-      "Show status" "Read connection and verified broker status" \
-      "Run read-only health check" "Verify installed identities and clean idle state" \
-      "Recover verified stale runtime" "Guarded cleanup after expiry or an interrupted session" \
-      "Exit" "Close this launcher" 2>/dev/null)" || return
+    if [[ "${NULLGATE_NO_DIALOG:-0}" != 1 && -n "${DISPLAY:-}" ]] \
+        && command -v zenity >/dev/null 2>&1; then
+      choice="$(zenity --list --title="NullGate · PiXi" --width=620 --height=380 \
+        --text="PiXi must be plugged in and unlocked. Enable Rooted debugging before Start, Stop, or Recovery." \
+        --column="Action" --column="What it does" \
+        "Start ColorBlendr NullGate session" "Verify PiXi and launch the temporary theme broker" \
+        "Stop and clean session" "Revoke/stop, archive the log, remove runtime, unroot ADB" \
+        "Show status" "Read connection and verified broker status" \
+        "Run read-only health check" "Verify installed identities and clean idle state" \
+        "Recover verified stale runtime" "Guarded cleanup after expiry or an interrupted session" \
+        "Exit" "Close this launcher" 2>/dev/null)" || return
+    else
+      printf '\nNullGate · PiXi — device must be plugged in and unlocked.\n'
+      printf 'Enable Rooted debugging only for Start, Stop, or Recovery.\n'
+      printf '1) Start ColorBlendr session\n2) Stop and clean session\n'
+      printf '3) Show status\n4) Read-only health check\n'
+      printf '5) Recover verified stale runtime\n6) Exit\n'
+      read -r -p 'Select [1-6]: ' selection || return
+      case "$selection" in
+        1) choice="Start ColorBlendr NullGate session" ;;
+        2) choice="Stop and clean session" ;;
+        3) choice="Show status" ;;
+        4) choice="Run read-only health check" ;;
+        5) choice="Recover verified stale runtime" ;;
+        *) return ;;
+      esac
+    fi
     case "$choice" in
       "Start ColorBlendr NullGate session") start_session ;;
       "Stop and clean session") stop_session ;;
