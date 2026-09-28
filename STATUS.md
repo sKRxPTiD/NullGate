@@ -76,5 +76,7 @@ The paired build is now byte-reproducible across consecutive clean signed host
 builds; see `REPRODUCIBLE_BUILD_2026-09-28.md`. The exact deterministic
 controller, theme-client and broker artifacts subsequently passed their own
 supervised PiXi grant/revoke/expiry/restoration gate. They are eligible for a
-separately reviewed 0.2.0 candidate bundle; no bundle has been promoted into
+separately reviewed 0.2.0 candidate bundle. The resulting local RC1 bundle was
+staged and audited successfully; see `CANDIDATE_STAGE_2026-09-28.md`. It remains
+under ignored `dist/release-candidate/`, and no bundle has been promoted into
 the immutable `releases/` directory.
