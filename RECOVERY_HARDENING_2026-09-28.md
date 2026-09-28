@@ -26,8 +26,12 @@ operation preserves the receipt and runtime. These checks narrow the race
 window; they are not an atomic lock against another privileged process.
 
 A simulated archive-write failure and a copy-corruption regression confirm
-that both failures are rejected and the runtime and theme receipt remain present. The existing
-successful VALUE and NULL restoration scenarios continue to pass.
+that both failures are rejected and the runtime and theme receipt remain
+present. The existing successful VALUE and NULL restoration scenarios continue
+to pass.
+
+The archive-copy test helper is recorded executable in Git, independently of
+TerraDrive's uniform permission presentation, so fresh clones can run it.
 
 Validation: shell syntax, the full simulated v2 device-helper suite, launcher
 tests and Git whitespace checks. All device interactions in these suites use

@@ -59,6 +59,13 @@ left by a forced broker exit is revalidated and removed only after recovery is
 otherwise complete. Recovery restores from the validated theme snapshot when
 one exists, or uses the no-lease cleanup path when no snapshot was ever created.
 
+Theme recovery verifies the downloaded snapshot against the device hash before
+restoring it, verifies the host archive, and rechecks the receipt before removal.
+Broker cleanup also verifies its archived log. Archives use unique names.
+An archive failure can occur after the theme was restored; retained receipts
+or runtime files still require inspection or a retry, even if the theme looks
+normal. Preserve failed or partial archives along with the reported error.
+
 If recovery refuses, stop there and return to Codex. Do not manually delete
 `/data/local/tmp/nullgate`.
 
