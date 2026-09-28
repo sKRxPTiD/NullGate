@@ -83,3 +83,12 @@ The added `recover-controller-record` gate addresses this real upgrade state
 without weakening broker `NOT_FOUND` handling. Its simulated tests cover exact
 archival/removal and refusal on mismatched theme, unsafe record, unexpired
 deadline, existing runtime, live broker and wrong mutation acknowledgement.
+
+The supervised gate subsequently completed. Visible approval, an explicit
+revoke, a natural 120-second expiry, exact theme restoration, clean client
+reconciliation, broker shutdown, runtime removal and return to non-root ADB all
+passed. The broker's 15-minute deadline also expired safely during an approval:
+approval was disabled, the theme remained unchanged, and the hash-locked
+controller-record recovery restored a clean starting state before the expiry
+test was repeated. Full evidence and final-state hashes are recorded in
+`DEVICE_TEST_PASS_2026-09-28.md`.

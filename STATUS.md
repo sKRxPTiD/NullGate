@@ -1,4 +1,4 @@
-# NullGate status — 2026-09-26
+# NullGate status — 2026-09-28
 
 ## PiXi private MVP: complete
 
@@ -8,17 +8,19 @@ system-theme capability has passed real grant, explicit revoke, automatic
 the private ColorBlendr fork. The controller and client identities are pinned.
 The ordinary idle state is non-root ADB with no broker runtime.
 
-## Active source: 0.2.0 host candidate
+## Active source: 0.2.0 PiXi-validated candidate
 
 The active source has advanced to version code 3 for the second first-party
-typed client. This does not replace or revise the installed 0.1.0 PiXi baseline.
-The signed host build, policy tests, lifecycle tests, artifact checksums and
-simulated device-helper suite pass. The new controller and theme-client artifacts
-remain host-only until a separate device gate is reviewed and authorized.
+typed client. This does not replace or revise the immutable 0.1.0 release
+baseline. The signed host build, policy tests, lifecycle tests, artifact
+checksums and simulated device-helper suite pass. The reviewed controller and
+theme-client artifacts also passed their supervised PiXi installation,
+grant, explicit-revoke, natural-expiry, exact-restoration, reconciliation and
+shutdown gate on 2026-09-28.
 
-The 2026-09-28 remediation review is complete for supervised device validation;
-see `DEPLOYMENT_REVIEW_2026-09-28.md` for the reviewed candidate hashes and
-remaining live checks. This is not a new live-test pass or a release promotion.
+See `DEPLOYMENT_REVIEW_2026-09-28.md` for the remediation review and
+`DEVICE_TEST_PASS_2026-09-28.md` for the resulting live evidence. This is a
+validated development candidate, not a new release promotion.
 
 ColorBlendr is the first client, not NullGate's architecture. New clients use
 the same broker contract, identity checks, lease rules and audit decisions, but
@@ -38,10 +40,9 @@ each new capability still needs a narrow adapter and its own restoration test.
    deliberately managed release identity before public distribution.
 3. Resilience: power loss, kernel failure or a forcibly killed broker can delay
    cleanup; the guarded host recovery path remains part of the safety model.
-4. Generalization: the second first-party typed client now passes its host gate;
-   installation and live grant/revoke/expiry/restoration remain a separate
-   device gate. NullGate never grants a generic shell just because one client
-   passed.
+4. Generalization: the second first-party typed client now passes both its host
+   and PiXi device gates. NullGate never grants a generic shell just because one
+   client passed.
 5. Public product work: installer, user-facing onboarding, release support and
    broader device/ROM testing are separate from the working PiXi deployment.
 
