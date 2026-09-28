@@ -8,7 +8,8 @@ source <(sed '/^case "${1:-menu}" in/,$d' "$BASE_DIR/device/nullgate-pixi")
 ADB_BIN=SIMULATED_ADB_ONLY
 SERIAL=PIXI_TEST_SERIAL
 test_log="$(mktemp)"
-trap 'rm -f -- "$test_log"' EXIT
+test_home=""
+trap 'rm -f -- "$test_log"; if [[ -n "$test_home" ]]; then rm -rf -- "$test_home"; fi' EXIT
 fail() { printf '%b\n' "$1" >&2; return 1; }
 info() { printf 'SUCCESS: %b\n' "$1"; }
 require_connection() { return 0; }
@@ -101,4 +102,25 @@ for scenario in recovery-refused recovery-unsafe recovery-verification-failed; d
   [[ "$(cat "$test_log")" == unroot ]]
 done
 
-printf 'NullGate launcher regressions: 11 passed (simulated ADB only)\n'
+test_home="$(mktemp -d)"
+android_sdk="${ANDROID_HOME:-$HOME/Android/Sdk}"
+HOME="$test_home" \
+ANDROID_HOME="$android_sdk" \
+APKSIGNER_BIN="${APKSIGNER_BIN:-$android_sdk/build-tools/36.0.0/apksigner}" \
+AAPT2_BIN="${AAPT2_BIN:-$android_sdk/build-tools/36.0.0/aapt2}" \
+NULLGATE_LAUNCHER_TARGET="$test_home/bin/nullgate-pixi" \
+NULLGATE_DESKTOP_DIR="$test_home/app-folder" \
+NULLGATE_DESKTOP_SHORTCUT_TARGET="$test_home/Desktop/NullGate PiXi.desktop" \
+  bash "$BASE_DIR/device/install-dolowolf-launcher.sh" >/dev/null
+[[ -x "$test_home/bin/nullgate-pixi" \
+  && -x "$test_home/app-folder/NullGate PiXi.desktop" \
+  && -x "$test_home/Desktop/NullGate PiXi.desktop" ]] || {
+  echo "Launcher installer did not create executable app entries." >&2
+  exit 1
+}
+cmp -s "$test_home/app-folder/NullGate PiXi.desktop" \
+  "$test_home/Desktop/NullGate PiXi.desktop"
+desktop-file-validate "$test_home/app-folder/NullGate PiXi.desktop" \
+  "$test_home/Desktop/NullGate PiXi.desktop"
+
+printf 'NullGate launcher regressions: 12 passed (simulated ADB and isolated installer)\n'

@@ -24,19 +24,21 @@ without installing files:
 bash ./device/install-dolowolf-launcher.sh --check
 ```
 
-Then install the command at `~/.local/bin/nullgate-pixi`, the desktop entry in
-`~/Desktop/All Appz`, and the icon in the user's hicolor icon theme:
+Then install the command at `~/.local/bin/nullgate-pixi`, executable desktop
+entries in `~/Desktop` and `~/Desktop/All Appz`, and the icon in the user's
+hicolor icon theme:
 
 ```bash
 bash ./device/install-dolowolf-launcher.sh
 ```
 
-The installer uses the current user's home directory. Override the launcher or
-desktop directory with `NULLGATE_LAUNCHER_TARGET` or `NULLGATE_DESKTOP_DIR` if
-needed. It validates both shell scripts and the generated desktop entry before
-writing the three launcher files. Run it again after updating the active source;
-the desktop command is local, while the launcher uses the canonical source
-checkout for its guarded helper and identity pins.
+The installer uses the current user's home directory. Override the launcher,
+app-folder entry, or direct desktop shortcut with `NULLGATE_LAUNCHER_TARGET`,
+`NULLGATE_DESKTOP_DIR`, or `NULLGATE_DESKTOP_SHORTCUT_TARGET` if needed. It
+validates both shell scripts and the generated desktop entries before writing
+the launcher files. Run it again after updating the active source; the desktop
+command is local, while the launcher uses the canonical source checkout for its
+guarded helper and identity pins.
 
 ## First read-only check
 

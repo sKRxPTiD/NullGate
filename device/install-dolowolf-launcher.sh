@@ -7,6 +7,7 @@ HOME_DIR="${HOME:?HOME must be set to install the DoloWOLF launcher}"
 LAUNCHER_TARGET="${NULLGATE_LAUNCHER_TARGET:-$HOME_DIR/.local/bin/nullgate-pixi}"
 DESKTOP_DIR="${NULLGATE_DESKTOP_DIR:-$HOME_DIR/Desktop/All Appz}"
 DESKTOP_TARGET="$DESKTOP_DIR/NullGate PiXi.desktop"
+DESKTOP_SHORTCUT_TARGET="${NULLGATE_DESKTOP_SHORTCUT_TARGET:-$HOME_DIR/Desktop/NullGate PiXi.desktop}"
 ICON_TARGET="$HOME_DIR/.local/share/icons/hicolor/256x256/apps/nullgate.png"
 DESKTOP_SOURCE="$SOURCE_DIR/NullGate PiXi.desktop"
 ICON_SOURCE="$PROJECT_DIR/res/drawable-nodpi/nullgate_launcher_icon.png"
@@ -56,17 +57,19 @@ desktop-file-validate "$GENERATED_DESKTOP" \
 
 if [[ "${1:-}" == --check ]]; then
   printf 'NullGate launcher setup check passed.\n'
-  printf 'Launcher: %s\nDesktop entry: %s\nIcon: %s\n' \
-    "$LAUNCHER_TARGET" "$DESKTOP_TARGET" "$ICON_TARGET"
+  printf 'Launcher: %s\nApp folder entry: %s\nDesktop shortcut: %s\nIcon: %s\n' \
+    "$LAUNCHER_TARGET" "$DESKTOP_TARGET" "$DESKTOP_SHORTCUT_TARGET" "$ICON_TARGET"
   exit 0
 fi
 
 install -Dm755 "$LAUNCHER_SOURCE" "$LAUNCHER_TARGET"
-install -Dm644 "$GENERATED_DESKTOP" "$DESKTOP_TARGET"
+install -Dm755 "$GENERATED_DESKTOP" "$DESKTOP_TARGET"
+install -Dm755 "$GENERATED_DESKTOP" "$DESKTOP_SHORTCUT_TARGET"
 install -Dm644 "$ICON_SOURCE" "$ICON_TARGET"
 desktop-file-validate "$DESKTOP_TARGET"
+desktop-file-validate "$DESKTOP_SHORTCUT_TARGET"
 bash -n "$LAUNCHER_TARGET"
 
 printf 'NullGate DoloWOLF launcher installed and validated.\n'
-printf 'Launcher: %s\nDesktop entry: %s\nIcon: %s\n' \
-  "$LAUNCHER_TARGET" "$DESKTOP_TARGET" "$ICON_TARGET"
+printf 'Launcher: %s\nApp folder entry: %s\nDesktop shortcut: %s\nIcon: %s\n' \
+  "$LAUNCHER_TARGET" "$DESKTOP_TARGET" "$DESKTOP_SHORTCUT_TARGET" "$ICON_TARGET"
