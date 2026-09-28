@@ -63,6 +63,12 @@ Run `release/verify-reproducible-build.sh` for a two-clean-build comparison.
 The latest verified manifest and the boundary between host reproducibility and
 device validation are recorded in `REPRODUCIBLE_BUILD_2026-09-28.md`.
 
+After the exact deterministic set passes its device gate, use
+`release/package-pixi-0.2.0-candidate.sh` to stage the reviewed private upgrade
+candidate under ignored `dist/release-candidate/`. The packager refuses dirty
+tracked state, unexpected untracked files, hash drift and signer drift. It does
+not write into the authoritative `releases/` directory.
+
 Use `./build.sh --preflight` to validate dependencies, release metadata, and
 the selected signing pair without changing files. Use `./build.sh --host-only`
 for the same host compilation, artifact, signing, metadata, and checksum
