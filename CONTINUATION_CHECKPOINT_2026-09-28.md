@@ -39,15 +39,12 @@ receipt, kill a live broker, or clear controller records merely to force a test.
 Plan the supervised gate before changing device state.
 
 The preserved 0.2.0 RC1 ZIP and checksum still verify. Its helper predates this
-hardening. The 0.1.0 baseline ZIP and sidecar retain their verified hashes.
-Neither preserved release was updated by this pass.
+hardening. RC2 contains the hardened helper and updated beginner guide and was
+promoted as a private candidate; its receipt is
+`RELEASE_PROMOTION_RC2_2026-09-28.md`. The 0.1.0 baseline ZIP and sidecar retain
+their verified hashes. No APK was reinstalled during this pass.
 
 ## Safe continuation
-
-The current uncommitted launcher change extends failure-path unroot behavior
-from Recovery to Start and Stop. Syntax has been checked; its launcher
-regressions have not yet been updated or run, and the installed launcher has
-not yet been refreshed for this change. Keep it as the immediate next task.
 
 Resume with status and this checkpoint; no context recovery from other chats
 is required. Routine host work is interruptible. Signing files, preserved

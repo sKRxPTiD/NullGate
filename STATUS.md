@@ -66,8 +66,9 @@ before removal. The simulated failure regressions pass; see
 helper directly. A supervised PiXi broker start/stop with no lease passed log
 hash verification, cleanup and return to ordinary ADB with an unchanged theme.
 Theme-receipt recovery validation remains simulated. These follow-up changes
-were excluded from RC1. RC2 packaging includes the hardened helper and updated
-operator guidance while retaining the same PiXi-validated Android artifacts.
+were excluded from RC1. RC2 is now packaged and promoted with the hardened
+helper, updated beginner guidance, and the same PiXi-validated Android
+artifacts. See `RELEASE_PROMOTION_RC2_2026-09-28.md`.
 
 The DoloWOLF launcher was refreshed from tracked source after the 0.2.0 live
 pass. Its read-only doctor verifies the installed controller code 3, theme
