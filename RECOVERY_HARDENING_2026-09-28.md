@@ -20,6 +20,11 @@ Theme receipt downloads are also checked against a valid device SHA-256 before
 parsing or restoring the theme. A corrupted transfer containing valid JSON is
 rejected before restoration; the simulated device state remains unchanged.
 
+Immediately before removing the theme receipt, recovery checks again for a
+broker and rechecks the receipt hash. A simulated receipt change during the
+operation preserves the receipt and runtime. These checks narrow the race
+window; they are not an atomic lock against another privileged process.
+
 A simulated archive-write failure and a copy-corruption regression confirm
 that both failures are rejected and the runtime and theme receipt remain present. The existing
 successful VALUE and NULL restoration scenarios continue to pass.

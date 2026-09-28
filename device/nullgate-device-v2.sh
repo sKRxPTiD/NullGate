@@ -560,6 +560,9 @@ recover_system_theme_runtime() {
   [[ "$(sha256sum "$archived_receipt" | awk '{print $1}')" == "$receipt_hash" ]] \
     || { rm -rf -- "$temp_dir"; die "theme recovery archive failed hash verification; device receipt preserved"; }
   rm -rf -- "$temp_dir"
+  require_no_broker
+  [[ "$(adb_device shell "sha256sum $DEVICE_DIR/theme.snapshot" | awk '{print $1}' | tr -d '\r')" == "$remote_receipt_hash" ]] \
+    || die "theme recovery receipt changed before removal; runtime preserved"
   adb_device shell "rm -f $DEVICE_DIR/theme.snapshot" >/dev/null || die "could not remove verified theme recovery receipt"
   remove_validated_stale_pid_receipt "$pid"
   cleanup_runtime "$THEME_MUTATION_TOKEN"

@@ -210,10 +210,15 @@ case "$request" in
   "shell rm -f /data/local/tmp/nullgate/leases/lease_0000000001.lease")
     leases=0; save ;;
   "shell sha256sum /data/local/tmp/nullgate/theme.snapshot")
-    if [[ "$scenario" == theme-recovery-null ]]; then
+    if [[ "$scenario" == theme-recovery-receipt-changed && -f "$state_file.receipt-hashed" ]]; then
+      printf 'changed receipt\n' | sha256sum
+    elif [[ "$scenario" == theme-recovery-null ]]; then
       printf 'NULL\n' | sha256sum
     else
       printf 'VALUE\n{"android.theme.customization.color_source":"home_wallpaper"}\n' | sha256sum
+    fi
+    if [[ "$scenario" == theme-recovery-receipt-changed ]]; then
+      touch "$state_file.receipt-hashed"
     fi ;;
   "shell sha256sum /data/local/tmp/nullgate/broker.log")
     printf 'test artifact\n' | sha256sum ;;
@@ -234,7 +239,7 @@ case "$request" in
     elif [[ "$theme_snapshot" == 1 ]]; then echo FILE:0:600:70
     else echo ABSENT; fi ;;
   "shell cmd settings put secure theme_customization_overlay_packages '{\"android.theme.customization.color_source\":\"home_wallpaper\"}'")
-    [[ ("$scenario" == theme-recovery || "$scenario" == theme-recovery-readback-fail) && "$theme_snapshot" == 1 ]] ;;
+    [[ ("$scenario" == theme-recovery || "$scenario" == theme-recovery-readback-fail || "$scenario" == theme-recovery-receipt-changed) && "$theme_snapshot" == 1 ]] ;;
   "shell cmd settings delete secure theme_customization_overlay_packages")
     [[ "$scenario" == theme-recovery-null && "$theme_snapshot" == 1 ]] ;;
   "shell settings get secure theme_customization_overlay_packages")
