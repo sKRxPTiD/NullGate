@@ -25,6 +25,11 @@ broker and rechecks the receipt hash. A simulated receipt change during the
 operation preserves the receipt and runtime. These checks narrow the race
 window; they are not an atomic lock against another privileged process.
 
+Additional regressions cover empty or failed device hash commands for both
+theme receipts and broker logs, and a broker appearing during theme restoration.
+Unavailable hashes leave simulated device state unchanged. A newly live broker
+blocks receipt removal and leaves runtime evidence present.
+
 A simulated archive-write failure and a copy-corruption regression confirm
 that both failures are rejected and the runtime and theme receipt remain
 present. The existing successful VALUE and NULL restoration scenarios continue
