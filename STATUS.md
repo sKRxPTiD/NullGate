@@ -58,3 +58,10 @@ Normal sessions start from DoloWOLF's **NullGate · PiXi** launcher. Rooted
 debugging is enabled only for a session and switched off after guarded Stop.
 An UNKNOWN state is never treated as clean; use the launcher recovery path and
 preserve evidence instead of manually deleting the runtime.
+
+The DoloWOLF launcher was refreshed from tracked source after the 0.2.0 live
+pass. Its read-only doctor verifies the installed controller code 3, theme
+client code 1, admitted ColorBlendr code 42001, all expected signers, ordinary
+ADB and an absent managed runtime. Separate launcher actions now open either
+ColorBlendr or the first-party Theme Client through the typed system-theme
+broker.
