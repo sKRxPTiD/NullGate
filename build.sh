@@ -11,6 +11,64 @@ KEY_DIR="${NULLGATE_KEY_DIR:-$BASE_DIR/keys}"
 KEYSTORE="$KEY_DIR/nullgate-local.keystore"
 KEYPASS_FILE="$KEY_DIR/.nullgate-local.pass"
 KEYPASS_FILE="${NULLGATE_KEYPASS_FILE:-$KEYPASS_FILE}"
+RUN_DEVICE_HARNESS=1
+INIT_DEV_SIGNING=0
+PREFLIGHT_ONLY=0
+
+usage() {
+  cat <<'EOF'
+Usage: ./build.sh [--preflight] [--host-only] [--init-dev-signing]
+
+  --preflight          Validate dependencies, metadata, and the selected
+                       signing identity without writing build output.
+  --host-only          Build and verify host artifacts without the simulated
+                       device-helper suite.
+  --init-dev-signing   Explicitly create the local development signing
+                       identity when neither signing file exists.
+EOF
+}
+
+while (($#)); do
+  case "$1" in
+    --preflight)
+      PREFLIGHT_ONLY=1
+      ;;
+    --host-only)
+      RUN_DEVICE_HARNESS=0
+      ;;
+    --init-dev-signing)
+      INIT_DEV_SIGNING=1
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown build option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
+
+if ((PREFLIGHT_ONLY && INIT_DEV_SIGNING)); then
+  echo "--preflight cannot be combined with --init-dev-signing" >&2
+  exit 2
+fi
+
+die() {
+  echo "NullGate build: $*" >&2
+  exit 1
+}
+
+INIT_TMP_DIR=""
+cleanup_signing_init() {
+  if [[ -n "$INIT_TMP_DIR" && -d "$INIT_TMP_DIR" ]]; then
+    rm -rf -- "$INIT_TMP_DIR"
+  fi
+}
+trap cleanup_signing_init EXIT
 
 for binary in "$BUILD_TOOLS/aapt2" "$BUILD_TOOLS/d8" "$BUILD_TOOLS/zipalign" "$BUILD_TOOLS/apksigner" "$ANDROID_JAR"; do
   [[ -e "$binary" ]] || { echo "Missing Android 36 build dependency: $binary" >&2; exit 1; }
@@ -22,6 +80,49 @@ command -v openssl >/dev/null
 
 bash "$BASE_DIR/release/check-release-metadata.sh"
 
+if [[ -f "$KEYSTORE" && ! -f "$KEYPASS_FILE" || -f "$KEYPASS_FILE" && ! -f "$KEYSTORE" ]]; then
+  die "incomplete signing identity; provide both the existing keystore and password file"
+fi
+if [[ ! -f "$KEYSTORE" && ! -f "$KEYPASS_FILE" ]]; then
+  if ((INIT_DEV_SIGNING)); then
+    mkdir -p "$KEY_DIR"
+    chmod 0700 "$KEY_DIR"
+    INIT_TMP_DIR="$(mktemp -d "$KEY_DIR/.nullgate-signing.XXXXXX")"
+    init_keystore="$INIT_TMP_DIR/nullgate-local.keystore"
+    init_keypass="$INIT_TMP_DIR/.nullgate-local.pass"
+    (umask 077 && openssl rand -hex 32 > "$init_keypass")
+    (umask 077; keytool -genkeypair -keystore "$init_keystore" -storepass:file "$init_keypass" \
+      -keypass:file "$init_keypass" -alias nullgate-local \
+      -dname "CN=NullGate Local,O=Null Protocol,C=US" \
+      -keyalg RSA -keysize 2048 -validity 3650 >/dev/null 2>&1)
+    keytool -list -keystore "$init_keystore" -storepass:file "$init_keypass" \
+      -alias nullgate-local >/dev/null 2>&1 \
+      || die "new development signing identity failed validation"
+    chmod 0600 "$init_keystore" "$init_keypass"
+    [[ ! -e "$KEYSTORE" && ! -e "$KEYPASS_FILE" ]] \
+      || die "signing identity appeared during initialization; refusing replacement"
+    mv -- "$init_keystore" "$KEYSTORE"
+    mv -- "$init_keypass" "$KEYPASS_FILE"
+    rmdir -- "$INIT_TMP_DIR"
+    INIT_TMP_DIR=""
+  else
+    die "signing identity is unavailable; provide an existing pair or explicitly use --init-dev-signing"
+  fi
+fi
+[[ ! -L "$KEYSTORE" ]] || die "signing keystore must not be a symbolic link"
+[[ ! -L "$KEYPASS_FILE" ]] || die "signing password file must not be a symbolic link"
+[[ -s "$KEYSTORE" && -s "$KEYPASS_FILE" ]] || die "signing identity files must be non-empty"
+[[ "$(stat -c %a "$KEYPASS_FILE")" == 600 ]] \
+  || die "signing password file must have mode 0600"
+keytool -list -keystore "$KEYSTORE" -storepass:file "$KEYPASS_FILE" \
+  -alias nullgate-local >/dev/null 2>&1 \
+  || die "signing password does not unlock the expected nullgate-local alias"
+
+if ((PREFLIGHT_ONLY)); then
+  echo "NullGate build preflight passed; no files were changed."
+  exit 0
+fi
+
 bash "$BASE_DIR/client/test.sh"
 bash "$BASE_DIR/test-client/test.sh"
 bash "$BASE_DIR/broker/test.sh"
@@ -30,11 +131,6 @@ rm -rf "$OUT_DIR" "$DIST_DIR"
 mkdir -p "$OUT_DIR/compiled-res" "$OUT_DIR/classes" "$OUT_DIR/dex" "$OUT_DIR/broker-classes" \
   "$OUT_DIR/broker-dex" "$OUT_DIR/client-reference" "$OUT_DIR/test-client-classes" \
   "$OUT_DIR/test-client-dex" "$DIST_DIR" "$KEY_DIR"
-chmod 0700 "$KEY_DIR"
-if [[ -f "$KEYSTORE" && ! -f "$KEYPASS_FILE" || -f "$KEYPASS_FILE" && ! -f "$KEYSTORE" ]]; then
-  echo "Incomplete signing identity; restore the existing key pair, do not silently replace it." >&2
-  exit 1
-fi
 
 "$BUILD_TOOLS/aapt2" compile --dir "$BASE_DIR/res" -o "$OUT_DIR/compiled-res"
 "$BUILD_TOOLS/aapt2" link --manifest "$BASE_DIR/AndroidManifest.xml" \
@@ -47,19 +143,6 @@ mapfile -d '' -t controller_classes < <(find "$OUT_DIR/classes" -name '*.class' 
 "$BUILD_TOOLS/d8" --min-api 26 --lib "$ANDROID_JAR" --output "$OUT_DIR/dex" \
   "${controller_classes[@]}"
 (cd "$OUT_DIR/dex" && zip -q -j "$OUT_DIR/base.apk" classes.dex)
-
-if [[ ! -f "$KEYPASS_FILE" ]]; then
-  (umask 077 && openssl rand -hex 32 > "$KEYPASS_FILE")
-fi
-chmod 0600 "$KEYPASS_FILE"
-if [[ ! -f "$KEYSTORE" ]]; then
-  (umask 077; keytool -genkeypair -keystore "$KEYSTORE" -storepass:file "$KEYPASS_FILE" \
-    -keypass:file "$KEYPASS_FILE" -alias nullgate-local \
-    -dname "CN=NullGate Local,O=Null Protocol,C=US" \
-    -keyalg RSA -keysize 2048 -validity 3650 >/dev/null 2>&1)
-fi
-chmod 0600 "$KEYSTORE"
-chmod 0600 "$KEY_DIR"/*.keystore
 
 # Compile the standalone client reference against the same Android API surface.
 mapfile -d '' -t reference_sources < <(find "$BASE_DIR/client/reference" -name '*.java' -print0)
@@ -118,4 +201,8 @@ mapfile -d '' -t broker_classes < <(find "$OUT_DIR/broker-classes" -name '*.clas
 echo "Built: $DIST_DIR/NullGate-prototype-debug.apk"
 echo "Built: $DIST_DIR/NullGate-test-client-debug.apk"
 echo "Built: $DIST_DIR/NullGate-broker.jar"
-bash "$BASE_DIR/device/test.sh"
+if ((RUN_DEVICE_HARNESS)); then
+  bash "$BASE_DIR/device/test.sh"
+else
+  echo "Host-only verification complete; simulated device-helper suite skipped."
+fi

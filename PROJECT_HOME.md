@@ -14,6 +14,11 @@ modes. Encrypted signing keystores may be retained with the project, but their
 plaintext password files must remain in DoloWOLF's protected local credential
 directory and be supplied with `NULLGATE_KEYPASS_FILE` when building.
 
-For the paired PiXi build, use `release/build-pixi-private.sh`. It selects the
-canonical TerraDrive source and encrypted keystore while requiring the local
-credential to remain mode `0600`.
+For the paired PiXi build, use `release/build-pixi-private.sh`. It defaults to
+the protected DoloWOLF credential paths under
+`/home/wolf/.local/share/nullgate-secrets/`; explicit absolute
+`NULLGATE_KEY_DIR` and `NULLGATE_KEYPASS_FILE` values may override them. The
+wrapper selects only the canonical source, refuses symbolic-link credentials,
+requires the password file to remain mode `0600`, and verifies the keystore
+certificate against the reviewed PiXi signer pin before invoking the build. It
+never selects credentials from an archived or historical source tree.

@@ -30,4 +30,4 @@ jobs:
           "$sdk_manager" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Run the complete verification build
-        run: ./build.sh
+        run: ./build.sh --init-dev-signing

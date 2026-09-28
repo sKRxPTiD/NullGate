@@ -42,11 +42,21 @@ for the concise completed-versus-remaining product boundary.
 ## Build and tests
 
 Install JDK 17 and Android SDK Platform 36 with Build Tools 36.0.0, set
-`ANDROID_HOME` when the SDK is not under `~/Android/Sdk`, then run
-`./build.sh`. It compiles and tests the Java core, builds both Android
+`ANDROID_HOME` when the SDK is not under `~/Android/Sdk`, and provide the
+matched existing `nullgate-local.keystore` plus `.nullgate-local.pass` through
+`NULLGATE_KEY_DIR` and `NULLGATE_KEYPASS_FILE` when they are not under `keys/`.
+Then run `./build.sh`. It compiles and tests the Java core, builds both Android
 artifacts, verifies APK signatures and records SHA-256 checksums, then runs
-simulated device-helper tests. Device tests now run after artifacts exist, so
-the build no longer depends on a previous dist directory.
+simulated device-helper tests. Device tests run after artifacts exist, so the
+full build no longer depends on a previous dist directory.
+
+Use `./build.sh --preflight` to validate dependencies, release metadata, and
+the selected signing pair without changing files. Use `./build.sh --host-only`
+for the same host compilation, artifact, signing, metadata, and checksum
+verification without the simulated device-helper suite. The local development
+signing identity is never generated implicitly; `./build.sh
+--init-dev-signing` is the deliberate bootstrap command when both development
+signing files are absent.
 
 Current result: **174 host Java checks** (74 broker/security, 66 external-client
 policy/state, and 34 test-client response/lifecycle checks) and the stateful device-helper scenario suite pass, including
@@ -77,13 +87,21 @@ Outputs:
 - `dist/controller-cert-sha256.txt`
 - `dist/SHA256SUMS`
 
-The first local build generates a development-only signing identity under
-`keys/`. Git ignores that directory. The controller and test client are signed
-with that same local identity so each can reject an unpaired build. Keep the key
-and password file together for repeat local builds, and never publish them.
-Set `NULLGATE_KEY_DIR` to an existing private key directory when rebuilding an
+A deliberately initialized local build can create a development-only signing
+identity under `keys/`; Git ignores that directory. Ordinary builds require an
+existing matched keystore and password file and never replace either one. The
+controller and test client are signed with that same identity so each can reject
+an unpaired build. Keep the encrypted keystore private and keep its plaintext
+password file on protected local storage. Set `NULLGATE_KEY_DIR` and
+`NULLGATE_KEYPASS_FILE` to explicit existing paths when rebuilding an
 already-installed paired prototype. Production distribution needs a separately
 managed release identity and a fresh signer-policy review.
+
+On DoloWOLF, `release/build-pixi-private.sh` selects the protected paired PiXi
+credential paths, verifies the reviewed signer pin, and forwards build options.
+Run `release/build-pixi-private.sh --preflight` for a read-only readiness check
+or add `--host-only` for a host artifact build without the simulated device
+helper suite.
 
 ## Device safety gate
 
