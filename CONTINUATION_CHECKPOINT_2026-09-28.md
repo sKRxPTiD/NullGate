@@ -48,7 +48,10 @@ is required. Routine host work is interruptible. Signing files, preserved
 releases, the protected filename and historical trees remain protected.
 Use the lowest adequate model and notify Wolf before raising its level.
 
-GitHub HTTPS pushes work, but emit a warning from an obsolete credential helper
-pointing into `/tmp/nullgate-gh.fiIrIv`. The working CLI also resides under
-`/tmp/nullgate-gh-cli`; persistent credential-helper maintenance remains a
-separate follow-up. Never print tokens or credential-file contents.
+GitHub HTTPS authentication was subsequently made persistent on DoloWOLF.
+The already-authenticated CLI 2.101.0 executable was copied byte-for-byte to
+`/home/wolf/.local/lib/github-cli/2.101.0/bin/gh`. Global and GitHub-specific
+credential-helper settings now use that path instead of temporary binaries.
+Authenticated API access confirmed `sKRxPTiD`, and a push dry run passed without
+obsolete-helper warnings. No new token or SSH key was created; credential
+contents were not printed. Never print tokens or credential-file contents.
