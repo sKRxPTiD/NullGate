@@ -6,6 +6,7 @@ HELPER="$BASE_DIR/device/nullgate-device-v2.sh"
 FAKE_ADB="$BASE_DIR/device/test/fake-adb-v2.sh"
 FAKE_SIGNER="$BASE_DIR/device/test/fake-apksigner.sh"
 FAKE_AAPT2="$BASE_DIR/device/test/fake-aapt2.sh"
+FAKE_RECORD="$BASE_DIR/device/test/external-client-record.xml"
 TEST_DIR="$(mktemp -d)"
 trap 'rm -rf -- "$TEST_DIR"' EXIT
 STATE="$TEST_DIR/state"
@@ -59,6 +60,21 @@ run_theme_client_helper() {
     "$HELPER" "$action"
 }
 
+run_controller_record_recovery() {
+  local scenario="$1" record_hash theme_hash
+  record_hash="$(sha256sum "$FAKE_RECORD" | awk '{print $1}')"
+  theme_hash="$(printf '%s' 'SIMULATED_RESTORED_THEME' | sha256sum | awk '{print $1}')"
+  FAKE_STATE_FILE="$STATE" FAKE_SCENARIO="$scenario" \
+    FAKE_CERT_FILE="$BASE_DIR/dist/controller-cert-sha256.txt" \
+    FAKE_BROKER_FILE="$BASE_DIR/dist/NullGate-broker.jar" FAKE_RECORD_FILE="$FAKE_RECORD" \
+    NULLGATE_SERIAL=PIXI_TEST_SERIAL NULLGATE_MUTATION_TOKEN=NULLGATE_CONTROLLER_RECORD_RECOVERY_V1 \
+    NULLGATE_EXPECTED_RECORD_SHA256="$record_hash" NULLGATE_EXPECTED_THEME_SHA256="$theme_hash" \
+    NULLGATE_EXPECTED_LEASE_ID=a2d90ac5-e36c-4f5b-b26d-44fcd5c0f578 \
+    NULLGATE_EXPECTED_CLIENT_PACKAGE=com.drdisagree.colorblendr \
+    NULLGATE_LOG_DIR="$TEST_DIR/logs" ADB_BIN="$FAKE_ADB" APKSIGNER_BIN="$FAKE_SIGNER" AAPT2_BIN="$FAKE_AAPT2" \
+    "$HELPER" recover-controller-record
+}
+
 expect_test_client_failure() {
   local scenario="$1" expected="$2" output
   if output="$(run_test_client_helper "$scenario" install-test-client 2>&1)"; then
@@ -84,6 +100,40 @@ if output="$(FAKE_STATE_FILE="$STATE" FAKE_SCENARIO=ready   FAKE_CERT_FILE="$BAS
   echo "mutation authorization was not required" >&2; exit 1
 fi
 [[ "$output" == *"device writes are locked"* ]]
+
+set_state 1
+if output="$(run_helper ready recover-controller-record 2>&1)"; then
+  echo "marker token enabled controller-record recovery" >&2; exit 1
+fi
+[[ "$output" == *"controller-record recovery acknowledgement required"* ]]
+
+set_state 1 0 0 0 0 0 1
+run_controller_record_recovery controller-record >/dev/null
+[[ "$(cat "$STATE")" == *"unknown=0"* ]]
+[[ "$(find "$TEST_DIR/logs" -maxdepth 1 -type f -name 'controller-record-*.xml' | wc -l)" == 1 ]]
+
+for scenario in controller-record-theme-mismatch controller-record-symlink controller-record-unexpired; do
+  set_state 1 0 0 0 0 0 1
+  before="$(cat "$STATE")"
+  if output="$(run_controller_record_recovery "$scenario" 2>&1)"; then
+    echo "controller-record recovery accepted $scenario" >&2; exit 1
+  fi
+  [[ "$(cat "$STATE")" == "$before" ]] || {
+    echo "rejected controller-record recovery changed device state: $scenario" >&2; exit 1;
+  }
+done
+set_state 1 1 0 0 0 0 1
+before="$(cat "$STATE")"
+if output="$(run_controller_record_recovery controller-record 2>&1)"; then
+  echo "controller-record recovery accepted an existing runtime" >&2; exit 1
+fi
+[[ "$(cat "$STATE")" == "$before" ]]
+set_state 1 0 0 1 0 0 1
+before="$(cat "$STATE")"
+if output="$(run_controller_record_recovery controller-record 2>&1)"; then
+  echo "controller-record recovery accepted a live broker" >&2; exit 1
+fi
+[[ "$(cat "$STATE")" == "$before" ]]
 
 set_state 1
 if output="$(run_helper ready install-test-client 2>&1)"; then

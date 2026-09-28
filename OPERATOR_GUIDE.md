@@ -55,6 +55,16 @@ one exists, or uses the no-lease cleanup path when no snapshot was ever created.
 If recovery refuses, stop there and return to Codex. Do not manually delete
 `/data/local/tmp/nullgate`.
 
+An unresolved controller record can remain even after the root runtime was
+independently verified absent, as observed during the 0.1.0 to 0.2.0 upgrade.
+That record must not be cleared merely because its elapsed deadline passed or a
+fresh broker reports `NOT_FOUND`. The host-only `recover-controller-record`
+action is the narrow recovery path: it requires the exact record hash, lease ID,
+client package and independently recorded restored-theme hash. It stops the
+controller, verifies the reviewed controller version and signer, requires no
+broker or runtime, rejects a live/unexpired/unsafe record, archives the exact
+record under `device/logs`, and removes only that verified preference file.
+
 ## Command path
 
 The same controls are available in a DoloWOLF terminal:

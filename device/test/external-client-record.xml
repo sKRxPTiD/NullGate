@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+    <long name="approval_generation" value="31" />
+    <long name="duration" value="60000" />
+    <string name="phase">RECONCILING</string>
+    <long name="expires" value="174022026" />
+    <string name="lease_nonce">3aae680e-df7e-46b8-84db-42d2ee1bf08b</string>
+    <int name="seed" value="-8390201" />
+    <int name="client_uid" value="10310" />
+    <string name="client_package">com.drdisagree.colorblendr</string>
+    <string name="style">EXPRESSIVE</string>
+    <long name="issued" value="173962026" />
+    <string name="lease_id">a2d90ac5-e36c-4f5b-b26d-44fcd5c0f578</string>
+</map>

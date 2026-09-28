@@ -5,6 +5,7 @@ state_file="${FAKE_STATE_FILE:?}"
 scenario="${FAKE_SCENARIO:-ready}"
 cert_file="${FAKE_CERT_FILE:?}"
 broker_file="${FAKE_BROKER_FILE:?}"
+record_file="${FAKE_RECORD_FILE:-}"
 # Test-owned state file contains only these numeric flags.
 installed=0 runtime=0 broker=0 running=0 pid_receipt=0 leases=0 unknown=0 test_client=0 theme_snapshot=0 theme_client=0
 [[ -f "$state_file" ]] && source "$state_file"
@@ -24,6 +25,11 @@ fi
 shift 2
 
 if [[ "${1:-}" == pull ]]; then
+  if [[ "${2:-}" == /data/user/0/org.nullprotocol.nullgate/shared_prefs/external_client_leases.xml \
+      && "$unknown" == 1 && -f "$record_file" ]]; then
+    cp -- "$record_file" "$3"
+    exit 0
+  fi
   if [[ "${2:-}" == /data/local/tmp/nullgate/theme.snapshot && "$theme_snapshot" == 1 ]]; then
     if [[ "$scenario" == theme-recovery-null ]]; then
       printf 'NULL\n' > "$3"
@@ -99,6 +105,48 @@ case "$request" in
       if [[ "$scenario" == old-controller ]]; then echo '  versionCode=2 minSdk=26 targetSdk=36'
       else echo '  versionCode=3 minSdk=26 targetSdk=36'; fi
     fi ;;
+  "shell cmd package list packages -U org.nullprotocol.nullgate")
+    printf '%s\n' 'package:org.nullprotocol.nullgate uid:10258' \
+      'package:org.nullprotocol.nullgate.testclient uid:10308' \
+      'package:org.nullprotocol.nullgate.themeclient uid:10313' ;;
+  "shell am force-stop org.nullprotocol.nullgate") ;;
+  "shell pidof org.nullprotocol.nullgate") ;;
+  "shell sha256sum /data/user/0/org.nullprotocol.nullgate/shared_prefs/external_client_leases.xml")
+    [[ "$unknown" == 1 ]] || exit 1
+    sha256sum "$record_file" ;;
+  "shell rm -f /data/user/0/org.nullprotocol.nullgate/shared_prefs/external_client_leases.xml")
+    [[ "$unknown" == 1 ]] || exit 1
+    unknown=0; save ;;
+  "shell if test -e /data/user/0/org.nullprotocol.nullgate/shared_prefs/external_client_leases.xml || test -e /data/user/0/org.nullprotocol.nullgate/shared_prefs/external_client_leases.xml.bak; then echo PRESENT; else echo ABSENT; fi")
+    [[ "$unknown" == 1 ]] && echo PRESENT || echo ABSENT ;;
+  "shell if test -L /data/user/0/org.nullprotocol.nullgate; then echo SYMLINK; elif test -d /data/user/0/org.nullprotocol.nullgate; then stat -c 'DIR:%u:%g:%a' /data/user/0/org.nullprotocol.nullgate; else echo OTHER; fi")
+    echo DIR:10258:10258:700 ;;
+  "shell if test -L /data/user/0/org.nullprotocol.nullgate/shared_prefs; then echo SYMLINK; elif test -d /data/user/0/org.nullprotocol.nullgate/shared_prefs; then stat -c 'DIR:%u:%g:%a' /data/user/0/org.nullprotocol.nullgate/shared_prefs; else echo OTHER; fi")
+    echo DIR:10258:10258:771 ;;
+  "shell if test -L /data/user/0/org.nullprotocol.nullgate/shared_prefs/external_client_leases.xml; then echo SYMLINK; elif test -f /data/user/0/org.nullprotocol.nullgate/shared_prefs/external_client_leases.xml; then stat -c 'FILE:%u:%g:%a:%s' /data/user/0/org.nullprotocol.nullgate/shared_prefs/external_client_leases.xml; elif test -e /data/user/0/org.nullprotocol.nullgate/shared_prefs/external_client_leases.xml; then echo OTHER; else echo ABSENT; fi")
+    if [[ "$scenario" == controller-record-symlink ]]; then echo SYMLINK
+    elif [[ "$unknown" == 1 ]]; then printf 'FILE:10258:10258:660:%s\n' "$(stat -c %s "$record_file")"
+    else echo ABSENT; fi ;;
+  "shell if test -L /data/user/0/org.nullprotocol.nullgate/shared_prefs/external_client_leases.xml.bak; then echo SYMLINK; elif test -e /data/user/0/org.nullprotocol.nullgate/shared_prefs/external_client_leases.xml.bak; then echo PRESENT; else echo ABSENT; fi")
+    echo ABSENT ;;
+  "shell settings get secure theme_customization_overlay_packages")
+    if [[ "$scenario" == controller-record || "$scenario" == controller-record-symlink \
+        || "$scenario" == controller-record-unexpired ]]; then echo SIMULATED_RESTORED_THEME
+    elif [[ "$scenario" == controller-record-theme-mismatch ]]; then echo DIFFERENT_THEME
+    elif [[ "$scenario" == theme-recovery-null ]]; then echo null
+    elif [[ "$scenario" == theme-recovery-readback-fail ]]; then echo '{"mismatch":true}'
+    else echo '{"android.theme.customization.color_source":"home_wallpaper"}'; fi ;;
+  "shell sha256sum /data/user/0/org.nullprotocol.nullgate/shared_prefs/external_client_leases.xml")
+    [[ "$unknown" == 1 ]] || exit 1
+    sha256sum "$record_file" ;;
+  "shell cat /proc/uptime")
+    [[ "$scenario" == controller-record-unexpired ]] \
+      && printf '100.00 200.00\n' || printf '357312.83 1870469.28\n' ;;
+  "shell rm -f /data/user/0/org.nullprotocol.nullgate/shared_prefs/external_client_leases.xml")
+    [[ "$unknown" == 1 ]] || exit 1
+    unknown=0; save ;;
+  "shell if test -e /data/user/0/org.nullprotocol.nullgate/shared_prefs/external_client_leases.xml || test -e /data/user/0/org.nullprotocol.nullgate/shared_prefs/external_client_leases.xml.bak; then echo PRESENT; else echo ABSENT; fi")
+    [[ "$unknown" == 1 ]] && echo PRESENT || echo ABSENT ;;
   "shell if test -L /data/local/tmp/nullgate; then echo SYMLINK; elif test -d /data/local/tmp/nullgate; then stat -c 'DIR:%u:%a' /data/local/tmp/nullgate; elif test -e /data/local/tmp/nullgate; then echo OTHER; else echo ABSENT; fi")
     if [[ "$scenario" == runtime-symlink ]]; then echo SYMLINK
     elif [[ "$scenario" == unsafe-runtime ]]; then echo DIR:2000:777

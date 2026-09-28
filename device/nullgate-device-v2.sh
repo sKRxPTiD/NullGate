@@ -25,6 +25,7 @@ THEME_MUTATION_TOKEN="NULLGATE_SYSTEM_THEME_V1"
 COLORBLENDR_MUTATION_TOKEN="NULLGATE_COLORBLENDR_SHIZUKU_V1"
 TEST_CLIENT_MUTATION_TOKEN="NULLGATE_TEST_CLIENT_V1"
 THEME_CLIENT_MUTATION_TOKEN="NULLGATE_THEME_CLIENT_V1"
+CONTROLLER_RECORD_RECOVERY_TOKEN="NULLGATE_CONTROLLER_RECORD_RECOVERY_V1"
 SERIAL="${NULLGATE_SERIAL:-}"
 LOG_DIR="${NULLGATE_LOG_DIR:-$BASE_DIR/device/logs}"
 
@@ -32,8 +33,8 @@ die() { echo "NullGate: $*" >&2; exit 1; }
 note() { echo "NullGate: $*"; }
 
 case "${1:-}" in
-  preflight|status|verify-clean|install-controller|install-test-client|install-theme-client|deploy|deploy-system-theme|deploy-colorblendr-shizuku|stop|cleanup|recover-marker-runtime|recover-system-theme-runtime) ;;
-  *) die "usage: $0 {preflight|status|verify-clean|install-controller|install-test-client|install-theme-client|deploy|deploy-system-theme|deploy-colorblendr-shizuku|stop|cleanup|recover-marker-runtime|recover-system-theme-runtime}" ;;
+  preflight|status|verify-clean|install-controller|install-test-client|install-theme-client|deploy|deploy-system-theme|deploy-colorblendr-shizuku|stop|cleanup|recover-marker-runtime|recover-system-theme-runtime|recover-controller-record) ;;
+  *) die "usage: $0 {preflight|status|verify-clean|install-controller|install-test-client|install-theme-client|deploy|deploy-system-theme|deploy-colorblendr-shizuku|stop|cleanup|recover-marker-runtime|recover-system-theme-runtime|recover-controller-record}" ;;
 esac
 
 command -v "$ADB_BIN" >/dev/null 2>&1 || [[ -x "$ADB_BIN" ]] || die "ADB executable is unavailable"
@@ -57,6 +58,10 @@ case "$1" in
     ;;
   install-theme-client)
     [[ "${NULLGATE_MUTATION_TOKEN:-}" == "$THEME_CLIENT_MUTATION_TOKEN" ]] || die "device writes are locked; theme-client acknowledgement required"
+    [[ -n "$SERIAL" ]] || die "device writes require an explicit NULLGATE_SERIAL"
+    ;;
+  recover-controller-record)
+    [[ "${NULLGATE_MUTATION_TOKEN:-}" == "$CONTROLLER_RECORD_RECOVERY_TOKEN" ]] || die "device writes are locked; controller-record recovery acknowledgement required"
     [[ -n "$SERIAL" ]] || die "device writes require an explicit NULLGATE_SERIAL"
     ;;
 esac
@@ -249,6 +254,8 @@ preflight() {
   require_artifacts
   platform_preflight
   verify_installed_signer
+  [[ "$(installed_version_code "$PACKAGE")" == "$CONTROLLER_VERSION_CODE" ]] \
+    || die "broker deployment requires reviewed controller version $CONTROLLER_VERSION_CODE"
   note "preflight passed: serial $SERIAL; tokay; Android 16; LineageOS 23.2; UID 0; u:r:su:s0; Enforcing; signer pinned"
 }
 
@@ -540,6 +547,106 @@ recover_system_theme_runtime() {
   note "theme restored exactly from the root-owned receipt and runtime removed"
 }
 
+recover_controller_record() {
+  require_mutation_authorization "$CONTROLLER_RECORD_RECOVERY_TOKEN"
+  platform_preflight
+  verify_installed_signer
+  [[ "$(installed_version_code "$PACKAGE")" == "$CONTROLLER_VERSION_CODE" ]] \
+    || die "controller-record recovery requires reviewed controller version $CONTROLLER_VERSION_CODE"
+  require_no_broker
+  [[ "$(runtime_state)" == ABSENT ]] \
+    || die "controller-record recovery requires an absent broker runtime"
+
+  local expected_record_hash="${NULLGATE_EXPECTED_RECORD_SHA256:-}"
+  local expected_theme_hash="${NULLGATE_EXPECTED_THEME_SHA256:-}"
+  local expected_lease_id="${NULLGATE_EXPECTED_LEASE_ID:-}"
+  local expected_client_package="${NULLGATE_EXPECTED_CLIENT_PACKAGE:-}"
+  [[ "$expected_record_hash" =~ ^[0-9a-f]{64}$ ]] \
+    || die "controller-record recovery requires the exact record SHA-256"
+  [[ "$expected_theme_hash" =~ ^[0-9a-f]{64}$ ]] \
+    || die "controller-record recovery requires the exact restored-theme SHA-256"
+  [[ "$expected_lease_id" =~ ^[A-Za-z0-9_-]{16,128}$ ]] \
+    || die "controller-record recovery requires the exact lease ID"
+  [[ "$expected_client_package" =~ ^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$ ]] \
+    || die "controller-record recovery requires the exact client package"
+
+  local app_uid record_path backup_path app_state prefs_state record_state backup_state
+  local current_theme current_theme_hash remote_hash temp_dir record_copy archived_copy
+  local recorded_expiry now_elapsed_millis
+  app_uid="$(adb_device shell "cmd package list packages -U $PACKAGE" \
+    | sed -n "s/^package:$PACKAGE uid://p" | tr -d '\r')"
+  [[ "$app_uid" =~ ^[1-9][0-9]{3,8}$ ]] || die "controller UID is unavailable or ambiguous"
+  record_path="/data/user/0/$PACKAGE/shared_prefs/external_client_leases.xml"
+  backup_path="$record_path.bak"
+
+  adb_device shell "am force-stop $PACKAGE" >/dev/null \
+    || die "controller could not be stopped for record recovery"
+  [[ -z "$(adb_device shell "pidof $PACKAGE" | tr -d '\r[:space:]')" ]] \
+    || die "controller process remains live; record recovery refused"
+  require_no_broker
+  [[ "$(runtime_state)" == ABSENT ]] \
+    || die "broker runtime appeared during controller-record recovery"
+
+  app_state="$(adb_device shell "if test -L /data/user/0/$PACKAGE; then echo SYMLINK; elif test -d /data/user/0/$PACKAGE; then stat -c 'DIR:%u:%g:%a' /data/user/0/$PACKAGE; else echo OTHER; fi" | tr -d '\r')"
+  prefs_state="$(adb_device shell "if test -L /data/user/0/$PACKAGE/shared_prefs; then echo SYMLINK; elif test -d /data/user/0/$PACKAGE/shared_prefs; then stat -c 'DIR:%u:%g:%a' /data/user/0/$PACKAGE/shared_prefs; else echo OTHER; fi" | tr -d '\r')"
+  record_state="$(adb_device shell "if test -L $record_path; then echo SYMLINK; elif test -f $record_path; then stat -c 'FILE:%u:%g:%a:%s' $record_path; elif test -e $record_path; then echo OTHER; else echo ABSENT; fi" | tr -d '\r')"
+  backup_state="$(adb_device shell "if test -L $backup_path; then echo SYMLINK; elif test -e $backup_path; then echo PRESENT; else echo ABSENT; fi" | tr -d '\r')"
+  [[ "$app_state" == "DIR:$app_uid:$app_uid:700" ]] \
+    || die "controller data directory is unsafe: $app_state"
+  [[ "$prefs_state" == "DIR:$app_uid:$app_uid:771" ]] \
+    || die "controller preference directory is unsafe: $prefs_state"
+  [[ "$record_state" =~ ^FILE:$app_uid:$app_uid:660:([1-9][0-9]{0,4})$ \
+      && "${BASH_REMATCH[1]}" -le 16384 ]] \
+    || die "controller recovery record is absent or unsafe: $record_state"
+  [[ "$backup_state" == ABSENT ]] \
+    || die "controller recovery backup exists; manual inspection required"
+
+  current_theme="$(adb_device shell settings get secure theme_customization_overlay_packages | tr -d '\r')"
+  current_theme_hash="$(printf '%s' "$current_theme" | sha256sum | awk '{print $1}')"
+  [[ "$current_theme_hash" == "$expected_theme_hash" ]] \
+    || die "current theme does not match the independently recorded restored baseline"
+  remote_hash="$(adb_device shell "sha256sum $record_path" | awk '{print $1}' | tr -d '\r')"
+  [[ "$remote_hash" == "$expected_record_hash" ]] \
+    || die "controller recovery record changed or does not match the reviewed hash"
+
+  temp_dir="$(mktemp -d)"
+  record_copy="$temp_dir/external_client_leases.xml"
+  adb_device pull "$record_path" "$record_copy" >/dev/null \
+    || { rm -rf -- "$temp_dir"; die "controller recovery record could not be archived"; }
+  chmod 0600 "$record_copy"
+  [[ "$(sha256sum "$record_copy" | awk '{print $1}')" == "$expected_record_hash" ]] \
+    || { rm -rf -- "$temp_dir"; die "archived controller record hash mismatch"; }
+  grep -Fqx "    <string name=\"lease_id\">$expected_lease_id</string>" "$record_copy" \
+    || { rm -rf -- "$temp_dir"; die "controller record lease ID does not match"; }
+  grep -Fqx "    <string name=\"client_package\">$expected_client_package</string>" "$record_copy" \
+    || { rm -rf -- "$temp_dir"; die "controller record client package does not match"; }
+  grep -Eq '^    <string name="phase">(RECONCILING|UNKNOWN|CLEANUP_FAILED)</string>$' "$record_copy" \
+    || { rm -rf -- "$temp_dir"; die "controller record is not in a recoverable uncertain phase"; }
+  recorded_expiry="$(sed -n 's/^    <long name="expires" value="\([0-9][0-9]*\)" \/>$/\1/p' "$record_copy")"
+  [[ "$recorded_expiry" =~ ^[0-9]{1,19}$ ]] \
+    || { rm -rf -- "$temp_dir"; die "controller record expiry is missing or malformed"; }
+  now_elapsed_millis="$(adb_device shell cat /proc/uptime \
+    | awk '{printf "%.0f\n", $1 * 1000}' | tr -d '\r')"
+  [[ "$now_elapsed_millis" =~ ^[0-9]{1,19}$ && "$recorded_expiry" -lt "$now_elapsed_millis" ]] \
+    || { rm -rf -- "$temp_dir"; die "controller record has not reached its elapsed deadline"; }
+
+  mkdir -p "$LOG_DIR"
+  archived_copy="$LOG_DIR/controller-record-$SERIAL-$(date -u +%Y%m%dT%H%M%SZ)-$expected_record_hash.xml"
+  install -m 0600 "$record_copy" "$archived_copy"
+  rm -rf -- "$temp_dir"
+
+  require_no_broker
+  [[ "$(runtime_state)" == ABSENT ]] \
+    || die "broker runtime appeared before controller-record removal"
+  [[ "$(adb_device shell "sha256sum $record_path" | awk '{print $1}' | tr -d '\r')" == "$expected_record_hash" ]] \
+    || die "controller recovery record changed before removal"
+  adb_device shell "rm -f $record_path" >/dev/null \
+    || die "verified controller recovery record could not be removed"
+  [[ "$(adb_device shell "if test -e $record_path || test -e $backup_path; then echo PRESENT; else echo ABSENT; fi" | tr -d '\r')" == ABSENT ]] \
+    || die "controller recovery record remains after removal"
+  note "verified stale controller record archived and removed; broker runtime remained absent"
+}
+
 case "$1" in
   preflight) preflight ;;
   status) status ;;
@@ -554,4 +661,5 @@ case "$1" in
   cleanup) cleanup_runtime ;;
   recover-marker-runtime) recover_marker_runtime ;;
   recover-system-theme-runtime) recover_system_theme_runtime ;;
+  recover-controller-record) recover_controller_record ;;
 esac

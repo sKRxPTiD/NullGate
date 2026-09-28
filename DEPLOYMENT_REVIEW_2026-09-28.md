@@ -68,3 +68,18 @@ No APK installation, broker launch or live lease test occurred during this
 review. PiXi's ADB identity was observed as UID 2000, `u:r:shell:s0`. The phone's
 Rooted debugging toggle was not inspected or changed. The installed DoloWOLF
 launcher was not refreshed; the fixes currently reside in the source tree.
+
+## Live-gate follow-up
+
+The reviewed controller and theme client were subsequently installed and
+pulled back byte-for-byte. Before the first new lease, the approval screen found
+a durable ColorBlendr `RECONCILING` record left by the completed 0.1.0 session
+and correctly disabled approval for the different client. No new lease was
+issued and the theme did not change. The fresh broker was stopped, its log was
+archived, the runtime was removed, the exact pre-test theme hash was confirmed,
+and ADB returned to UID 2000.
+
+The added `recover-controller-record` gate addresses this real upgrade state
+without weakening broker `NOT_FOUND` handling. Its simulated tests cover exact
+archival/removal and refusal on mismatched theme, unsafe record, unexpired
+deadline, existing runtime, live broker and wrong mutation acknowledgement.
