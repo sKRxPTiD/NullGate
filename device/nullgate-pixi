@@ -97,6 +97,13 @@ deactivate_root() {
   }
 }
 
+fail_and_return_to_shell() {
+  local message="$1"
+  fail "$message"
+  deactivate_root || return 1
+  return 1
+}
+
 runtime_state() {
   adb_pixi shell "if test -L $RUNTIME; then echo SYMLINK; elif test -d $RUNTIME; then stat -c 'DIR:%u:%a' $RUNTIME; elif test -e $RUNTIME; then echo OTHER; else echo ABSENT; fi" 2>/dev/null | tr -d '\r'
 }
@@ -108,28 +115,28 @@ start_typed_theme_session() {
 
   local preflight state status_output
   preflight="$(helper_read preflight 2>&1)" || {
-    fail "NullGate preflight failed. Nothing new was launched.\n\n$preflight"
+    fail_and_return_to_shell "NullGate preflight failed. Nothing new was launched.\n\n$preflight"
     return 1
   }
   state="$(runtime_state)"
   if [[ "$state" == ABSENT ]]; then
     status_output="$(helper_theme deploy-system-theme 2>&1)" || {
-      fail "The broker did not start. Its evidence was preserved for inspection.\n\n$status_output"
+      fail_and_return_to_shell "The broker did not start. Its evidence was preserved for inspection.\nADB returned to ordinary shell; inspect or recover the runtime before another session.\n\n$status_output"
       return 1
     }
   elif status_output="$(helper_read status 2>&1)"; then
     status_output="The verified broker was already running."
   else
-    fail "A previous NullGate runtime needs inspection. Do not request a lease.\n\nUse ‘Recover verified stale runtime’ or return to Codex.\n\n$status_output"
+    fail_and_return_to_shell "A previous NullGate runtime needs inspection. Do not request a lease.\nADB returned to ordinary shell; use ‘Recover verified stale runtime’ or return to Codex.\n\n$status_output"
     return 1
   fi
 
   adb_pixi shell am start -W -n "$PACKAGE/.MainActivity" >/dev/null 2>&1 || {
-    fail "The broker is running, but the controller screen could not be opened. Stop and clean the session before disconnecting."
+    fail_and_return_to_shell "The broker is running, but the controller screen could not be opened. ADB returned to ordinary shell; enable Rooted debugging again to stop and clean the session before disconnecting."
     return 1
   }
   adb_pixi shell am start -W -n "$client_activity" >/dev/null 2>&1 || {
-    fail "The broker is running, but $client_label could not be opened. Stop and clean the session before disconnecting."
+    fail_and_return_to_shell "The broker is running, but $client_label could not be opened. ADB returned to ordinary shell; enable Rooted debugging again to stop and clean the session before disconnecting."
     return 1
   }
   info "NullGate is ready for $client_label.\n\n$guidance\n\nWhen finished, use this launcher again and choose Stop and clean session."
@@ -159,7 +166,7 @@ stop_session() {
   state="$(runtime_state)"
   if [[ "$state" == ABSENT ]]; then
     output="$(helper_read verify-clean 2>&1)" || {
-      fail "The managed runtime is absent, but clean-state verification failed.\n\n$output"
+      fail_and_return_to_shell "The managed runtime is absent, but clean-state verification failed.\n\n$output"
       return 1
     }
     deactivate_root || return 1
@@ -167,15 +174,15 @@ stop_session() {
     return
   fi
   output="$(helper_write stop 2>&1)" || {
-    fail "NullGate did not confirm a clean stop. No forced kill or cleanup was attempted.\n\nUse Status, then Recover only if the broker has expired or stopped.\n\n$output"
+    fail_and_return_to_shell "NullGate did not confirm a clean stop. No forced kill or cleanup was attempted. ADB returned to ordinary shell; runtime evidence remains for inspection.\n\nUse Status, then Recover only if the broker has expired or stopped.\n\n$output"
     return 1
   }
   output="$(helper_write cleanup 2>&1)" || {
-    fail "The broker stopped, but cleanup was not confirmed. Evidence was preserved.\n\n$output"
+    fail_and_return_to_shell "The broker stopped, but cleanup was not confirmed. Evidence was preserved. ADB returned to ordinary shell.\n\n$output"
     return 1
   }
   output="$(helper_read verify-clean 2>&1)" || {
-    fail "Final clean-state verification failed.\n\n$output"
+    fail_and_return_to_shell "Final clean-state verification failed. ADB returned to ordinary shell; inspect remaining evidence before continuing.\n\n$output"
     return 1
   }
   deactivate_root || return 1

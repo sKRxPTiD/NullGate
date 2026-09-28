@@ -44,6 +44,11 @@ Neither preserved release was updated by this pass.
 
 ## Safe continuation
 
+The current uncommitted launcher change extends failure-path unroot behavior
+from Recovery to Start and Stop. Syntax has been checked; its launcher
+regressions have not yet been updated or run, and the installed launcher has
+not yet been refreshed for this change. Keep it as the immediate next task.
+
 Resume with status and this checkpoint; no context recovery from other chats
 is required. Routine host work is interruptible. Signing files, preserved
 releases, the protected filename and historical trees remain protected.

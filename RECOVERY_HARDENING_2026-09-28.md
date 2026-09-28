@@ -60,6 +60,13 @@ pass. The installed launcher was refreshed to this tracked version after
 verifying its previous bytes; the refreshed copy matches source. These new
 failure paths have not been exercised live on PiXi.
 
+Start and Stop failure paths now also return ADB to the ordinary shell while
+reporting whether a broker or runtime may still need attention. This keeps
+failed launch, interrupted UI, refused stop, failed cleanup and final-check
+errors distinct from a clean-session success. Shell syntax was checked; these
+new launcher branches still need simulated regression coverage before the next
+launcher refresh.
+
 The preserved RC1 bundle does not include this follow-up change. Its existing
 validation records remain applicable to its bytes. Live validation of this
 theme-receipt recovery follow-up remains pending.
