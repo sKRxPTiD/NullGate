@@ -540,7 +540,8 @@ recover_system_theme_runtime() {
   fi
   mkdir -p "$LOG_DIR"
   receipt_hash="$(sha256sum "$receipt" | awk '{print $1}')"
-  archived_receipt="$LOG_DIR/theme-recovery-$SERIAL-$(date -u +%Y%m%dT%H%M%SZ).snapshot"
+  archived_receipt="$(mktemp "$LOG_DIR/theme-recovery-$SERIAL-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX.snapshot")" \
+    || { rm -rf -- "$temp_dir"; die "theme recovery archive could not be reserved; device receipt preserved"; }
   cp -- "$receipt" "$archived_receipt" \
     || { rm -rf -- "$temp_dir"; die "theme recovery archive could not be written; device receipt preserved"; }
   [[ "$(sha256sum "$archived_receipt" | awk '{print $1}')" == "$receipt_hash" ]] \

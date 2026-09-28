@@ -7,6 +7,10 @@ preserved. Exact theme restoration still precedes archival, so this failure
 can leave a restored theme with a retained receipt; it does not prove runtime
 cleanup and the operator must inspect or retry recovery.
 
+Each theme archive is reserved with a unique filename so recoveries within the
+same second cannot overwrite earlier evidence. Reservation failure preserves
+the device receipt. A repeated-recovery test verifies both archives survive.
+
 A simulated archive-write failure and a copy-corruption regression confirm
 that both failures are rejected and the runtime and theme receipt remain present. The existing
 successful VALUE and NULL restoration scenarios continue to pass.

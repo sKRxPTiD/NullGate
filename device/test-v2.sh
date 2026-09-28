@@ -321,11 +321,16 @@ fi
 [[ "$output" == *"archive failed hash verification"* ]]
 [[ "$(cat "$STATE")" == *"runtime=1"*"theme_snapshot=1"* ]]
 set_state 1 1 1 0 0 0 0 0 1
+archive_count_before="$(find "$TEST_DIR/logs" -maxdepth 1 -type f -name 'theme-recovery-*.snapshot' | wc -l)"
 run_theme_helper theme-recovery recover-system-theme-runtime >/dev/null
 run_theme_helper ready verify-clean >/dev/null
 set_state 1 1 1 0 0 0 0 0 1
 run_theme_helper theme-recovery-null recover-system-theme-runtime >/dev/null
 run_theme_helper ready verify-clean >/dev/null
+archive_count_after="$(find "$TEST_DIR/logs" -maxdepth 1 -type f -name 'theme-recovery-*.snapshot' | wc -l)"
+[[ "$archive_count_after" -eq "$((archive_count_before + 2))" ]] || {
+  echo "successive theme recoveries overwrote archived evidence" >&2; exit 1;
+}
 set_state 1 1 1 0 1 0 0 0 1
 run_theme_helper theme-recovery recover-system-theme-runtime >/dev/null
 run_theme_helper ready verify-clean >/dev/null
