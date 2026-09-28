@@ -63,8 +63,10 @@ The subsequent host recovery hardening verifies snapshot transfers and archived
 receipts/logs, preserves unique evidence files, and rechecks the theme receipt
 before removal. The simulated failure regressions pass; see
 `RECOVERY_HARDENING_2026-09-28.md`. The installed launcher uses this source
-helper directly. These follow-up changes have not been live-tested on PiXi
-and are not included in the preserved RC1 bundle.
+helper directly. A supervised PiXi broker start/stop with no lease passed log
+hash verification, cleanup and return to ordinary ADB with an unchanged theme.
+Theme-receipt recovery validation remains simulated. These follow-up changes
+are not included in the preserved RC1 bundle.
 
 The DoloWOLF launcher was refreshed from tracked source after the 0.2.0 live
 pass. Its read-only doctor verifies the installed controller code 3, theme
