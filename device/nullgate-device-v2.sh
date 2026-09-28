@@ -413,14 +413,22 @@ stop_broker() {
 }
 
 archive_log() {
-  local log_state archive_dir stamp
+  local log_state archive_dir stamp archive_file remote_hash
   log_state="$(adb_device shell "if test -L $DEVICE_DIR/broker.log; then echo SYMLINK; elif test -f $DEVICE_DIR/broker.log; then stat -c 'FILE:%u:%a' $DEVICE_DIR/broker.log; elif test -e $DEVICE_DIR/broker.log; then echo OTHER; else echo ABSENT; fi" | tr -d '\r')"
   [[ "$log_state" == ABSENT ]] && return
   [[ "$log_state" == FILE:0:600 ]] || die "unsafe broker log state: $log_state"
   archive_dir="$LOG_DIR"
   mkdir -p "$archive_dir"
   stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-  adb_device pull "$DEVICE_DIR/broker.log" "$archive_dir/broker-$SERIAL-$stamp.log" >/dev/null     || die "could not preserve broker log"
+  remote_hash="$(adb_device shell "sha256sum $DEVICE_DIR/broker.log" | awk '{print $1}' | tr -d '\r')" \
+    || die "could not hash broker log; runtime preserved"
+  [[ "$remote_hash" =~ ^[0-9a-f]{64}$ ]] || die "invalid broker log hash; runtime preserved"
+  archive_file="$(mktemp "$archive_dir/broker-$SERIAL-$stamp-XXXXXX.log")" \
+    || die "could not reserve broker log archive; runtime preserved"
+  adb_device pull "$DEVICE_DIR/broker.log" "$archive_file" >/dev/null \
+    || die "could not preserve broker log"
+  [[ "$(sha256sum "$archive_file" | awk '{print $1}')" == "$remote_hash" ]] \
+    || die "broker log archive hash mismatch; runtime preserved"
   note "broker log archived under device/logs"
 }
 

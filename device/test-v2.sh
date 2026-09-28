@@ -308,6 +308,12 @@ expect_failure inventory-fail recover-marker-runtime "UNKNOWN"
 expect_failure proc-fail recover-marker-runtime "UNKNOWN"
 [[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0 theme_snapshot=0 theme_client=0" ]]
 
+set_state 1 1 1
+before="$(cat "$STATE")"
+expect_failure log-corrupt cleanup "broker log archive hash mismatch"
+[[ "$(cat "$STATE")" == "$before" ]] || {
+  echo "corrupted log archive permitted runtime cleanup" >&2; exit 1;
+}
 set_state 1 1 1 0 0 0 0 0 1
 if output="$(PATH="$BASE_DIR/device/test/archive-copy:$PATH" NULLGATE_TEST_FAIL_ARCHIVE=1 run_theme_helper theme-recovery recover-system-theme-runtime 2>&1)"; then
   echo "failed theme recovery archive write was accepted" >&2; exit 1

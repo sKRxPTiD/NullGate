@@ -11,6 +11,11 @@ Each theme archive is reserved with a unique filename so recoveries within the
 same second cannot overwrite earlier evidence. Reservation failure preserves
 the device receipt. A repeated-recovery test verifies both archives survive.
 
+Broker logs likewise use unique archive names. Cleanup now obtains a valid
+device SHA-256 and verifies the downloaded log against it before deleting the
+runtime. A simulated corrupt transfer confirms cleanup aborts with the runtime
+unchanged. Transfer or hash failures require inspection or a retry.
+
 A simulated archive-write failure and a copy-corruption regression confirm
 that both failures are rejected and the runtime and theme receipt remain present. The existing
 successful VALUE and NULL restoration scenarios continue to pass.

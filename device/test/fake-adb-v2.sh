@@ -39,7 +39,11 @@ if [[ "${1:-}" == pull ]]; then
     exit 0
   fi
   [[ "$installed" == 1 || "$test_client" == 1 || "${2:-}" == */broker.log ]] || exit 1
-  printf 'test artifact\n' > "$3"
+  if [[ "$scenario" == log-corrupt && "${2:-}" == */broker.log ]]; then
+    printf 'corrupted log\n' > "$3"
+  else
+    printf 'test artifact\n' > "$3"
+  fi
   exit 0
 fi
 if [[ "${1:-}" == push ]]; then
@@ -203,6 +207,8 @@ case "$request" in
     else printf 'lease=lease_0000000001\nexpiresElapsed=999999\n'; fi ;;
   "shell rm -f /data/local/tmp/nullgate/leases/lease_0000000001.lease")
     leases=0; save ;;
+  "shell sha256sum /data/local/tmp/nullgate/broker.log")
+    printf 'test artifact\n' | sha256sum ;;
   "shell if test -L /data/local/tmp/nullgate/broker.log; then echo SYMLINK; elif test -f /data/local/tmp/nullgate/broker.log; then stat -c 'FILE:%u:%a' /data/local/tmp/nullgate/broker.log; elif test -e /data/local/tmp/nullgate/broker.log; then echo OTHER; else echo ABSENT; fi")
     if [[ "$scenario" == log-symlink ]]; then echo SYMLINK
     elif [[ "$broker" == 1 ]]; then echo FILE:0:600
