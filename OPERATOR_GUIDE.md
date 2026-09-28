@@ -21,7 +21,26 @@ approval, explicit revoke, natural expiry, exact restoration, reconciliation,
 broker shutdown and runtime removal on 2026-09-28. See
 `DEVICE_TEST_PASS_2026-09-28.md`.
 
-## Normal session
+### First use
+
+1. Connect PiXi to DoloWOLF, unlock it, and make sure USB debugging is approved.
+2. Turn on **Rooted debugging** on PiXi for this session.
+3. Open **NullGate · PiXi** from DoloWOLF's **All Appz** folder.
+4. Choose **Start Theme Client NullGate session**. This opens NullGate and the
+   first-party Theme Client. ColorBlendr is a separate optional client.
+5. In Theme Client, pick a palette and style, request the two-minute lease, then
+   approve it on NullGate's protected approval screen.
+6. To end early, tap **Restore previous theme now**. Otherwise wait for expiry,
+   return to Theme Client, and tap **Reconcile** to confirm restoration.
+7. Return to the DoloWOLF launcher and choose **Stop and clean session**. Wait
+   for its clean-session message, then turn **Rooted debugging off** on PiXi.
+
+If any step reports UNKNOWN, an error, or an uncertain result, do not repeat
+approval. Choose **Show status** and preserve the screen and logs for recovery.
+Use **Recover verified stale runtime** only after an interrupted or expired
+session, when no lease should remain.
+
+## Routine operation
 
 1. Plug PiXi into DoloWOLF and unlock the phone.
 2. On PiXi, enable **Developer options → Rooted debugging**.

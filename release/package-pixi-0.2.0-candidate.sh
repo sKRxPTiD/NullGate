@@ -3,9 +3,9 @@ set -euo pipefail
 
 BASE_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 DIST_DIR="$BASE_DIR/dist"
-OUTPUT_DIR="$DIST_DIR/release-candidate"
-BUNDLE_NAME="NullGate-PiXi-private-0.2.0-rc1-2026-09-28.zip"
-PAYLOAD_NAME="NullGate-PiXi-private-0.2.0-rc1"
+OUTPUT_DIR="$DIST_DIR/release-candidate/rc2"
+BUNDLE_NAME="NullGate-PiXi-private-0.2.0-rc2-2026-09-28.zip"
+PAYLOAD_NAME="NullGate-PiXi-private-0.2.0-rc2"
 REPRODUCIBLE_EPOCH=946684800
 PROTECTED_UNTRACKED="ha256sum -c NullGate-PiXi-private-2026-09-26.zip.sha256"
 EXPECTED_MANIFEST='7c5c2ed63eace24c4cc318c8833b5f1da6265abbe1ae4e4af5524dc1cce99b7d  NullGate-prototype-debug.apk
@@ -65,6 +65,8 @@ install -m 0644 "$BASE_DIR/DEVICE_TEST_PASS_2026-09-28.md" \
 install -m 0644 "$BASE_DIR/REPRODUCIBLE_BUILD_2026-09-28.md" \
   "$payload/REPRODUCIBLE_BUILD.md"
 install -m 0644 "$BASE_DIR/OPERATOR_GUIDE.md" "$payload/operator/OPERATOR_GUIDE.md"
+install -m 0644 "$BASE_DIR/RECOVERY_HARDENING_2026-09-28.md" \
+  "$payload/operator/RECOVERY_HARDENING.md"
 install -m 0644 "$BASE_DIR/INSTALL_AND_ONBOARD.md" \
   "$payload/operator/INSTALL_AND_ONBOARD.md"
 install -m 0755 "$BASE_DIR/device/nullgate-pixi" "$payload/operator/nullgate-pixi"
@@ -83,7 +85,7 @@ git -C "$BASE_DIR" archive --format=tar HEAD | gzip -n -9 \
   > "$payload/source/$source_name"
 
 {
-  printf 'candidate=NullGate PiXi private 0.2.0 rc1\n'
+  printf 'candidate=NullGate PiXi private 0.2.0 rc2\n'
   printf 'source_commit=%s\n' "$commit"
   printf 'source_branch=%s\n' "$branch"
   printf 'controller_version=0.2.0\ncontroller_version_code=3\n'
