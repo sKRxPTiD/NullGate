@@ -28,7 +28,10 @@ public final class ExternalLeaseStatePolicyTest {
                 "lease-A", "lease-A", "ACTIVE", 7L, 7L, 200L, 200L, 200L));
         check(!ExternalLeaseStatePolicy.canDeliverGrant(
                 "lease-A", "lease-B", "ACTIVE", 7L, 7L, 200L, 200L, 100L));
-        System.out.println("NullGate external lease-state checks: 14 passed");
+        check(ExternalLeaseStatePolicy.confirmsCleanup("REVOKED"));
+        check(!ExternalLeaseStatePolicy.confirmsCleanup("NOT_FOUND"));
+        check(!ExternalLeaseStatePolicy.confirmsCleanup("CLEANUP_FAILED"));
+        System.out.println("NullGate external lease-state checks: 17 passed");
     }
 
     private static void check(boolean value) { if (!value) throw new AssertionError(); }

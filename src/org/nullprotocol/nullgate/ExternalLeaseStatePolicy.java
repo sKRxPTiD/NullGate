@@ -33,4 +33,9 @@ public final class ExternalLeaseStatePolicy {
                 && capturedGeneration == currentGeneration
                 && capturedExpiry == currentExpiry && currentExpiry > nowElapsed;
     }
+
+    /** Only an affirmative cleanup receipt proves that an uncertain effect was removed. */
+    public static boolean confirmsCleanup(String decision) {
+        return "REVOKED".equals(decision);
+    }
 }

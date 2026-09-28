@@ -66,7 +66,7 @@ activate_root() {
     fail "Rooted ADB could not start.\n\nOn PiXi, enable Developer options → Rooted debugging, then try again.\n\n$output"
     return 1
   }
-  adb_pixi wait-for-device >/dev/null 2>&1 || {
+  timeout 15s "$ADB_BIN" -s "$SERIAL" wait-for-device >/dev/null 2>&1 || {
     fail "PiXi did not reconnect after starting rooted ADB."
     return 1
   }
@@ -75,6 +75,23 @@ activate_root() {
   enforcement="$(adb_pixi shell getenforce 2>/dev/null | tr -d '\r')"
   [[ "$identity" == uid=0\(* && "$context" == u:r:su:s0 && "$enforcement" == Enforcing ]] || {
     fail "Root verification failed. Nothing was deployed.\n\nIdentity: $identity\nContext: $context\nSELinux: $enforcement"
+    return 1
+  }
+}
+
+deactivate_root() {
+  local output identity
+  output="$(adb_pixi unroot 2>&1)" || {
+    fail "ADB could not return to non-root. Rooted debugging must be disabled manually.\n\n$output"
+    return 1
+  }
+  timeout 15s "$ADB_BIN" -s "$SERIAL" wait-for-device >/dev/null 2>&1 || {
+    fail "PiXi did not reconnect after ADB was returned to non-root."
+    return 1
+  }
+  identity="$(adb_pixi shell id 2>/dev/null | tr -d '\r')"
+  [[ "$identity" == uid=2000\(* ]] || {
+    fail "ADB did not verify as ordinary shell after unroot. Disable Rooted debugging manually.\n\n$identity"
     return 1
   }
 }
@@ -124,7 +141,11 @@ stop_session() {
   local state output
   state="$(runtime_state)"
   if [[ "$state" == ABSENT ]]; then
-    adb_pixi unroot >/dev/null 2>&1 || true
+    output="$(helper_read verify-clean 2>&1)" || {
+      fail "The managed runtime is absent, but clean-state verification failed.\n\n$output"
+      return 1
+    }
+    deactivate_root || return 1
     info "NullGate was already clean. ADB was returned to non-root.\n\nTurn off Rooted debugging on PiXi if it is still enabled."
     return
   fi
@@ -140,7 +161,7 @@ stop_session() {
     fail "Final clean-state verification failed.\n\n$output"
     return 1
   }
-  adb_pixi unroot >/dev/null 2>&1 || true
+  deactivate_root || return 1
   info "Session closed cleanly.\n\nThe broker stopped, lease markers are absent, the log was archived, the temporary runtime was removed, and ADB returned to non-root.\n\nNow turn off Rooted debugging on PiXi."
 }
 
@@ -273,7 +294,7 @@ recover_runtime() {
     fail "Recovery ran, but final verification failed.\n\n$output"
     return 1
   }
-  adb_pixi unroot >/dev/null 2>&1 || true
+  deactivate_root || return 1
   info "Verified stale runtime recovered and ADB returned to non-root.\n\nTurn off Rooted debugging on PiXi."
 }
 

@@ -429,7 +429,7 @@ public final class ClientRequestActivity extends Activity {
             return;
         }
 
-        if ("REVOKED".equals(event.decision) || "NOT_FOUND".equals(event.decision)) {
+        if (ExternalLeaseStatePolicy.confirmsCleanup(event.decision)) {
             OwnedRecord current = ownedRecord(operationClientPackage, operationClientUid);
             if (current == null || (event.leaseId.equals(current.leaseId)
                     && clearRecordIfOwned(event.leaseId, operationClientPackage,

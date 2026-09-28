@@ -35,6 +35,7 @@ die() { printf 'NullGate launcher setup: %s\n' "$*" >&2; exit 1; }
   || die "launcher, device helper, desktop entry, or icon is missing from the active source tree"
 command -v desktop-file-validate >/dev/null 2>&1 \
   || die "desktop-file-validate is unavailable; install the desktop-file-utils package"
+command -v timeout >/dev/null 2>&1 || die "timeout is unavailable; install coreutils"
 command -v "$ADB_BIN" >/dev/null 2>&1 || [[ -x "${ADB_BIN:-}" ]] \
   || die "ADB is unavailable; install Android platform-tools or set ADB_BIN"
 APKSIGNER_BIN="${APKSIGNER_BIN:-$BUILD_TOOLS/apksigner}"

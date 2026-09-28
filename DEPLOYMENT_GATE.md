@@ -36,6 +36,31 @@ It does not authorize a device write by itself.
    leases, remove only the validated managed runtime, and confirm it is absent.
 10. Return ADB to non-root and disable Rooted debugging on PiXi.
 
+## NullGate 0.2.0 theme-client gate
+
+The first live theme-client pass is separate from the completed 0.1.0 ColorBlendr
+baseline. Before installing it:
+
+1. Satisfy every identity, clean-runtime, archive, signer and checksum condition
+   above.
+2. Update the controller to reviewed version code 3 while no broker or managed
+   runtime exists.
+3. Install the theme client only through `install-theme-client`, with the pinned
+   serial and the dedicated `NULLGATE_THEME_CLIENT_V1` acknowledgement.
+4. Pull both installed APKs back and verify package, version and sole signer.
+   Compare their SHA-256 hashes with the reviewed local candidate APKs; version
+   code 3 and a matching signer alone do not identify the remediation build.
+5. Confirm installation launched no broker and created no managed runtime.
+6. Record the exact pre-test theme value before the first lease. Run immediate
+   revoke before testing watchdog expiry, and require exact restoration after
+   each path.
+7. Treat broker `NOT_FOUND`, missing replies, malformed replies and transport
+   failures as unresolved. Preserve the controller record and runtime evidence.
+   The controller's separate no-record reconciliation response also uses
+   `NOT_FOUND`; it is not a broker cleanup receipt and does not prove restoration.
+8. Stop and clean through the guarded helper, verify zero leases and an absent
+   runtime, then verify ADB as UID 2000 and disable Rooted debugging.
+
 ## Stop conditions
 
 Stop without improvising if any signer, package owner, version, UID, SELinux

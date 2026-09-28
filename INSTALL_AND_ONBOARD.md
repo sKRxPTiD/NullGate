@@ -12,7 +12,8 @@ PiXi.
   `~/Android/Sdk`. Set `ANDROID_HOME` or `APKSIGNER_BIN` / `AAPT2_BIN` when the
   SDK is elsewhere.
 - `desktop-file-utils` for validating the desktop entry.
-- Zenity is optional. The launcher has a terminal menu when Zenity is absent.
+- Zenity is optional. The desktop entry opens a terminal so the fallback menu
+  remains visible when Zenity is absent.
 
 ## Check, then install
 
@@ -65,5 +66,8 @@ stop. Do not manually remove files under `/data/local/tmp/nullgate`. Follow
 boundaries.
 
 The NullGate 0.2.0 theme-client APK is a host-verified development artifact.
-This setup guide does not authorize installing it on PiXi. Its separate device
-gate must be reviewed before installation or live theme testing.
+Its guarded installer is `install-theme-client` and requires the separate
+`NULLGATE_THEME_CLIENT_V1` mutation acknowledgement, an explicitly pinned
+device serial, the paired controller signer, an absent broker process, and an
+absent managed runtime. This setup guide does not itself authorize installation
+or live theme testing.

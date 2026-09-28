@@ -6,11 +6,11 @@ scenario="${FAKE_SCENARIO:-ready}"
 cert_file="${FAKE_CERT_FILE:?}"
 broker_file="${FAKE_BROKER_FILE:?}"
 # Test-owned state file contains only these numeric flags.
-installed=0 runtime=0 broker=0 running=0 pid_receipt=0 leases=0 unknown=0 test_client=0 theme_snapshot=0
+installed=0 runtime=0 broker=0 running=0 pid_receipt=0 leases=0 unknown=0 test_client=0 theme_snapshot=0 theme_client=0
 [[ -f "$state_file" ]] && source "$state_file"
 
 save() {
-  printf 'installed=%s runtime=%s broker=%s running=%s pid_receipt=%s leases=%s unknown=%s test_client=%s theme_snapshot=%s\n'     "$installed" "$runtime" "$broker" "$running" "$pid_receipt" "$leases" "$unknown" "$test_client" "$theme_snapshot" > "$state_file"
+  printf 'installed=%s runtime=%s broker=%s running=%s pid_receipt=%s leases=%s unknown=%s test_client=%s theme_snapshot=%s theme_client=%s\n'     "$installed" "$runtime" "$broker" "$running" "$pid_receipt" "$leases" "$unknown" "$test_client" "$theme_snapshot" "$theme_client" > "$state_file"
 }
 
 if [[ "${1:-}" == get-serialno ]]; then
@@ -45,6 +45,8 @@ if [[ "${1:-}" == install ]]; then
   install_target="${3:-${2:-}}"
   if [[ "$install_target" == *NullGate-test-client-debug.apk ]]; then
     test_client=1
+  elif [[ "$install_target" == *NullGate-theme-client-debug.apk ]]; then
+    theme_client=1
   else
     installed=1
   fi
@@ -60,6 +62,8 @@ case "$request" in
     if [[ "$installed" == 1 ]]; then echo package:org.nullprotocol.nullgate; fi ;;
   "shell pm list packages --user 0 org.nullprotocol.nullgate.testclient")
     if [[ "$test_client" == 1 ]]; then echo package:org.nullprotocol.nullgate.testclient; fi ;;
+  "shell pm list packages --user 0 org.nullprotocol.nullgate.themeclient")
+    if [[ "$theme_client" == 1 ]]; then echo package:org.nullprotocol.nullgate.themeclient; fi ;;
   "shell ps -A -o ARGS")
     [[ "$scenario" != inventory-fail ]] || exit 1
     echo ARGS
@@ -87,6 +91,14 @@ case "$request" in
   "shell pm path org.nullprotocol.nullgate.testclient")
     [[ "$test_client" == 1 ]] && echo package:/data/app/test/org.nullprotocol.nullgate.testclient/base.apk
     true ;;
+  "shell pm path org.nullprotocol.nullgate.themeclient")
+    [[ "$theme_client" == 1 ]] && echo package:/data/app/test/org.nullprotocol.nullgate.themeclient/base.apk
+    true ;;
+  "shell dumpsys package org.nullprotocol.nullgate")
+    if [[ "$installed" == 1 ]]; then
+      if [[ "$scenario" == old-controller ]]; then echo '  versionCode=2 minSdk=26 targetSdk=36'
+      else echo '  versionCode=3 minSdk=26 targetSdk=36'; fi
+    fi ;;
   "shell if test -L /data/local/tmp/nullgate; then echo SYMLINK; elif test -d /data/local/tmp/nullgate; then stat -c 'DIR:%u:%a' /data/local/tmp/nullgate; elif test -e /data/local/tmp/nullgate; then echo OTHER; else echo ABSENT; fi")
     if [[ "$scenario" == runtime-symlink ]]; then echo SYMLINK
     elif [[ "$scenario" == unsafe-runtime ]]; then echo DIR:2000:777

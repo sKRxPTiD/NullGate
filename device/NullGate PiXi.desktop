@@ -5,6 +5,6 @@ Name=NullGate · PiXi
 Comment=Start, inspect, stop, and recover PiXi NullGate sessions
 Exec=@NULLGATE_LAUNCHER@ menu
 Icon=nullgate
-Terminal=false
+Terminal=true
 Categories=Utility;
 StartupNotify=true

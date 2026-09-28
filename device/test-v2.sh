@@ -11,7 +11,7 @@ trap 'rm -rf -- "$TEST_DIR"' EXIT
 STATE="$TEST_DIR/state"
 
 set_state() {
-  printf 'installed=%s runtime=%s broker=%s running=%s pid_receipt=%s leases=%s unknown=%s test_client=%s theme_snapshot=%s\n'     "${1:-0}" "${2:-0}" "${3:-0}" "${4:-0}" "${5:-0}" "${6:-0}" "${7:-0}" "${8:-0}" "${9:-0}" > "$STATE"
+  printf 'installed=%s runtime=%s broker=%s running=%s pid_receipt=%s leases=%s unknown=%s test_client=%s theme_snapshot=%s theme_client=%s\n'     "${1:-0}" "${2:-0}" "${3:-0}" "${4:-0}" "${5:-0}" "${6:-0}" "${7:-0}" "${8:-0}" "${9:-0}" "${10:-0}" > "$STATE"
 }
 
 run_helper() {
@@ -49,6 +49,16 @@ run_test_client_helper() {
     "$HELPER" "$action"
 }
 
+run_theme_client_helper() {
+  local scenario="$1" action="$2"
+  FAKE_STATE_FILE="$STATE" FAKE_SCENARIO="$scenario" \
+    FAKE_CERT_FILE="$BASE_DIR/dist/controller-cert-sha256.txt" \
+    FAKE_BROKER_FILE="$BASE_DIR/dist/NullGate-broker.jar" \
+    NULLGATE_SERIAL=PIXI_TEST_SERIAL NULLGATE_MUTATION_TOKEN=NULLGATE_THEME_CLIENT_V1 \
+    NULLGATE_LOG_DIR="$TEST_DIR/logs" ADB_BIN="$FAKE_ADB" APKSIGNER_BIN="$FAKE_SIGNER" AAPT2_BIN="$FAKE_AAPT2" \
+    "$HELPER" "$action"
+}
+
 expect_test_client_failure() {
   local scenario="$1" expected="$2" output
   if output="$(run_test_client_helper "$scenario" install-test-client 2>&1)"; then
@@ -81,11 +91,60 @@ if output="$(run_helper ready install-test-client 2>&1)"; then
 fi
 [[ "$output" == *"test-client acknowledgement required"* ]]
 run_test_client_helper ready install-test-client >/dev/null
-[[ "$(cat "$STATE")" == "installed=1 runtime=0 broker=0 running=0 pid_receipt=0 leases=0 unknown=0 test_client=1 theme_snapshot=0" ]]
+[[ "$(cat "$STATE")" == "installed=1 runtime=0 broker=0 running=0 pid_receipt=0 leases=0 unknown=0 test_client=1 theme_snapshot=0 theme_client=0" ]]
 set_state 1 1 1
 expect_test_client_failure ready "requires an absent broker runtime"
 set_state
 expect_test_client_failure ready "controller is not installed"
+
+set_state 1
+if output="$(run_helper ready install-theme-client 2>&1)"; then
+  echo "marker token enabled theme-client installation" >&2; exit 1
+fi
+[[ "$output" == *"theme-client acknowledgement required"* ]]
+run_theme_client_helper ready install-theme-client >/dev/null
+[[ "$(cat "$STATE")" == "installed=1 runtime=0 broker=0 running=0 pid_receipt=0 leases=0 unknown=0 test_client=0 theme_snapshot=0 theme_client=1" ]]
+run_test_client_helper ready install-test-client >/dev/null
+[[ "$(cat "$STATE")" == *"test_client=1 theme_snapshot=0 theme_client=1" ]]
+run_theme_client_helper ready install-theme-client >/dev/null
+[[ "$(cat "$STATE")" == *"test_client=1 theme_snapshot=0 theme_client=1" ]]
+set_state 1 1 1
+if output="$(run_theme_client_helper ready install-theme-client 2>&1)"; then
+  echo "theme-client installation accepted an existing runtime" >&2; exit 1
+fi
+[[ "$output" == *"requires an absent broker runtime"* ]]
+set_state 1
+if output="$(run_theme_client_helper old-controller install-theme-client 2>&1)"; then
+  echo "theme-client installation accepted the old controller" >&2; exit 1
+fi
+[[ "$output" == *"requires the reviewed controller version 3"* ]]
+set_state
+if output="$(run_theme_client_helper ready install-theme-client 2>&1)"; then
+  echo "theme-client installation accepted a missing controller" >&2; exit 1
+fi
+[[ "$output" == *"controller is not installed"* ]]
+
+for scenario in wrong-local-package wrong-local-version wrong-signer nonroot inventory-fail install-fail; do
+  set_state 1
+  before="$(cat "$STATE")"
+  if output="$(run_theme_client_helper "$scenario" install-theme-client 2>&1)"; then
+    echo "theme-client installation accepted $scenario" >&2; exit 1
+  fi
+  [[ "$(cat "$STATE")" == "$before" ]] || {
+    echo "rejected theme-client installation changed device state: $scenario" >&2; exit 1;
+  }
+done
+set_state 1 0 0 1
+before="$(cat "$STATE")"
+if output="$(run_theme_client_helper ready install-theme-client 2>&1)"; then
+  echo "theme-client installation accepted a broker outside the managed runtime" >&2; exit 1
+fi
+[[ "$output" == *"broker is still running"* && "$(cat "$STATE")" == "$before" ]]
+set_state 1
+if output="$(run_test_client_helper ready install-theme-client 2>&1)"; then
+  echo "test-client token enabled theme-client installation" >&2; exit 1
+fi
+[[ "$output" == *"theme-client acknowledgement required"* ]]
 
 set_state 1
 if output="$(run_helper ready deploy-system-theme 2>&1)"; then
@@ -150,6 +209,8 @@ expect_failure wrong-local-package install-controller "package identity or versi
 set_state
 expect_failure wrong-local-version install-controller "package identity or version"
 [[ "$(cat "$STATE")" == *"installed=0"* ]]
+set_state 1 1 1
+expect_failure ready install-controller "requires an absent broker runtime"
 
 set_state 1
 expect_failure hash-mismatch deploy "digest mismatch"
@@ -165,7 +226,7 @@ set_state 1 1 1 0 0
 expect_failure cleanup-fail cleanup "runtime cleanup failed"
 set_state 1 1 1 1 1
 run_helper stale-receipt stop >/dev/null
-[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=0 leases=0 unknown=0 test_client=0 theme_snapshot=0" ]]
+[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=0 leases=0 unknown=0 test_client=0 theme_snapshot=0 theme_client=0" ]]
 set_state 1 1 1 1 1
 expect_failure term-fail stop "SIGTERM failed"
 set_state 1
@@ -181,7 +242,7 @@ run_helper ready recover-marker-runtime >/dev/null
 run_helper ready verify-clean >/dev/null
 set_state 1 1 1 0 1 1
 expect_failure marker-invalid recover-marker-runtime "content failed validation"
-[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0 theme_snapshot=0" ]]
+[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0 theme_snapshot=0 theme_client=0" ]]
 set_state 1 1 1 0 1 1
 expect_failure marker-unsafe recover-marker-runtime "ownership or mode"
 set_state 1 1 1 0 1 1
@@ -193,9 +254,9 @@ set_state 1 0 0 1 0
 expect_failure ready verify-clean "broker is still running"
 set_state 1 1 1 0 1 1
 expect_failure inventory-fail recover-marker-runtime "UNKNOWN"
-[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0 theme_snapshot=0" ]]
+[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0 theme_snapshot=0 theme_client=0" ]]
 expect_failure proc-fail recover-marker-runtime "UNKNOWN"
-[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0 theme_snapshot=0" ]]
+[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0 theme_snapshot=0 theme_client=0" ]]
 
 set_state 1 1 1 0 0 0 0 0 1
 run_theme_helper theme-recovery recover-system-theme-runtime >/dev/null
@@ -248,7 +309,7 @@ fi
 [[ "$output" == *"absent or unsafe"* ]]
 set_state 1 1 1 0 1 1
 expect_failure reused-pid recover-marker-runtime "recorded PID still exists"
-[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0 theme_snapshot=0" ]]
+[[ "$(cat "$STATE")" == "installed=1 runtime=1 broker=1 running=0 pid_receipt=1 leases=1 unknown=0 test_client=0 theme_snapshot=0 theme_client=0" ]]
 set_state 1 1 1 1 1
 expect_failure proc-fail stop "UNKNOWN"
 echo "NullGate device harness scenarios passed, including locked installs, recovery preservation and review regressions"

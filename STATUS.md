@@ -16,6 +16,10 @@ The signed host build, policy tests, lifecycle tests, artifact checksums and
 simulated device-helper suite pass. The new controller and theme-client artifacts
 remain host-only until a separate device gate is reviewed and authorized.
 
+The 2026-09-28 remediation review is complete for supervised device validation;
+see `DEPLOYMENT_REVIEW_2026-09-28.md` for the reviewed candidate hashes and
+remaining live checks. This is not a new live-test pass or a release promotion.
+
 ColorBlendr is the first client, not NullGate's architecture. New clients use
 the same broker contract, identity checks, lease rules and audit decisions, but
 each new capability still needs a narrow adapter and its own restoration test.

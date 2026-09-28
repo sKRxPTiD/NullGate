@@ -7,13 +7,16 @@ APKSIGNER_BIN="${APKSIGNER_BIN:-${ANDROID_HOME:-$HOME/Android/Sdk}/build-tools/3
 AAPT2_BIN="${AAPT2_BIN:-${ANDROID_HOME:-$HOME/Android/Sdk}/build-tools/36.0.0/aapt2}"
 APK="$BASE_DIR/dist/NullGate-prototype-debug.apk"
 TEST_CLIENT_APK="$BASE_DIR/dist/NullGate-test-client-debug.apk"
+THEME_CLIENT_APK="$BASE_DIR/dist/NullGate-theme-client-debug.apk"
 BROKER="$BASE_DIR/dist/NullGate-broker.jar"
 CERT_FILE="$BASE_DIR/dist/controller-cert-sha256.txt"
 CHECKSUM_FILE="$BASE_DIR/dist/SHA256SUMS"
 PACKAGE="org.nullprotocol.nullgate"
 TEST_CLIENT_PACKAGE="org.nullprotocol.nullgate.testclient"
+THEME_CLIENT_PACKAGE="org.nullprotocol.nullgate.themeclient"
 CONTROLLER_VERSION_CODE="3"
 TEST_CLIENT_VERSION_CODE="1"
+THEME_CLIENT_VERSION_CODE="1"
 BROKER_CLASS="org.nullprotocol.nullgate.broker.NullGateBrokerMain"
 DEVICE_DIR="/data/local/tmp/nullgate"
 DEVICE_BROKER="$DEVICE_DIR/NullGate-broker.jar"
@@ -21,6 +24,7 @@ MUTATION_TOKEN="NULLGATE_MARKER_TEST_V1"
 THEME_MUTATION_TOKEN="NULLGATE_SYSTEM_THEME_V1"
 COLORBLENDR_MUTATION_TOKEN="NULLGATE_COLORBLENDR_SHIZUKU_V1"
 TEST_CLIENT_MUTATION_TOKEN="NULLGATE_TEST_CLIENT_V1"
+THEME_CLIENT_MUTATION_TOKEN="NULLGATE_THEME_CLIENT_V1"
 SERIAL="${NULLGATE_SERIAL:-}"
 LOG_DIR="${NULLGATE_LOG_DIR:-$BASE_DIR/device/logs}"
 
@@ -28,8 +32,8 @@ die() { echo "NullGate: $*" >&2; exit 1; }
 note() { echo "NullGate: $*"; }
 
 case "${1:-}" in
-  preflight|status|verify-clean|install-controller|install-test-client|deploy|deploy-system-theme|deploy-colorblendr-shizuku|stop|cleanup|recover-marker-runtime|recover-system-theme-runtime) ;;
-  *) die "usage: $0 {preflight|status|verify-clean|install-controller|install-test-client|deploy|deploy-system-theme|deploy-colorblendr-shizuku|stop|cleanup|recover-marker-runtime|recover-system-theme-runtime}" ;;
+  preflight|status|verify-clean|install-controller|install-test-client|install-theme-client|deploy|deploy-system-theme|deploy-colorblendr-shizuku|stop|cleanup|recover-marker-runtime|recover-system-theme-runtime) ;;
+  *) die "usage: $0 {preflight|status|verify-clean|install-controller|install-test-client|install-theme-client|deploy|deploy-system-theme|deploy-colorblendr-shizuku|stop|cleanup|recover-marker-runtime|recover-system-theme-runtime}" ;;
 esac
 
 command -v "$ADB_BIN" >/dev/null 2>&1 || [[ -x "$ADB_BIN" ]] || die "ADB executable is unavailable"
@@ -51,6 +55,10 @@ case "$1" in
     [[ "${NULLGATE_MUTATION_TOKEN:-}" == "$TEST_CLIENT_MUTATION_TOKEN" ]] || die "device writes are locked; test-client acknowledgement required"
     [[ -n "$SERIAL" ]] || die "device writes require an explicit NULLGATE_SERIAL"
     ;;
+  install-theme-client)
+    [[ "${NULLGATE_MUTATION_TOKEN:-}" == "$THEME_CLIENT_MUTATION_TOKEN" ]] || die "device writes are locked; theme-client acknowledgement required"
+    [[ -n "$SERIAL" ]] || die "device writes require an explicit NULLGATE_SERIAL"
+    ;;
 esac
 if [[ -z "$SERIAL" ]]; then
   SERIAL="$("$ADB_BIN" get-serialno 2>/dev/null)" || die "PiXi is not connected through ADB"
@@ -67,7 +75,7 @@ require_mutation_authorization() {
 }
 
 require_artifacts() {
-  [[ -s "$APK" && -s "$TEST_CLIENT_APK" && -s "$BROKER" && -s "$CERT_FILE" && -s "$CHECKSUM_FILE" ]]     || die "artifacts missing; run build.sh"
+  [[ -s "$APK" && -s "$TEST_CLIENT_APK" && -s "$THEME_CLIENT_APK" && -s "$BROKER" && -s "$CERT_FILE" && -s "$CHECKSUM_FILE" ]]     || die "artifacts missing; run build.sh"
   (cd "$BASE_DIR/dist" && sha256sum --status -c SHA256SUMS)     || die "artifact checksum verification failed"
   local cert
   cert="$(tr -d '\r\n' < "$CERT_FILE")"
@@ -124,6 +132,15 @@ installed_apk_path() {
 
 verify_installed_signer() {
   verify_package_signer "$PACKAGE" controller
+}
+
+installed_version_code() {
+  local package_name="$1" version
+  version="$(adb_device shell dumpsys package "$package_name" \
+    | sed -n 's/^[[:space:]]*versionCode=\([0-9][0-9]*\).*/\1/p' \
+    | head -1 | tr -d '\r')" || return 1
+  [[ "$version" =~ ^[0-9]+$ ]] || return 1
+  printf '%s\n' "$version"
 }
 
 verify_package_signer() {
@@ -241,6 +258,8 @@ install_controller() {
   platform_preflight
   verify_local_apk_identity "$APK" "$PACKAGE" "$CONTROLLER_VERSION_CODE" controller
   verify_local_apk_signer "$APK" controller
+  require_no_broker
+  [[ "$(runtime_state)" == ABSENT ]] || die "controller installation requires an absent broker runtime"
   local package_output
   package_output="$(adb_device shell pm list packages --user 0 "$PACKAGE" | tr -d '\r')"
   if [[ -n "$package_output" ]]; then
@@ -277,6 +296,31 @@ install_test_client() {
   fi
   verify_package_signer "$TEST_CLIENT_PACKAGE" "test client"
   note "paired test client installed and signer verified; no broker was launched"
+}
+
+install_theme_client() {
+  require_mutation_authorization "$THEME_CLIENT_MUTATION_TOKEN"
+  require_artifacts
+  platform_preflight
+  verify_local_apk_identity "$THEME_CLIENT_APK" "$THEME_CLIENT_PACKAGE" "$THEME_CLIENT_VERSION_CODE" "theme client"
+  verify_local_apk_signer "$THEME_CLIENT_APK" "theme client"
+  verify_installed_signer
+  [[ "$(installed_version_code "$PACKAGE")" == "$CONTROLLER_VERSION_CODE" ]] \
+    || die "theme-client installation requires the reviewed controller version $CONTROLLER_VERSION_CODE"
+  require_no_broker
+  [[ "$(runtime_state)" == ABSENT ]] || die "theme-client installation requires an absent broker runtime"
+  local package_output
+  package_output="$(adb_device shell pm list packages --user 0 "$THEME_CLIENT_PACKAGE" | tr -d '\r')"
+  if [[ -n "$package_output" ]]; then
+    installed_apk_path "$THEME_CLIENT_PACKAGE" >/dev/null \
+      || die "theme-client package exists in an unsupported or ambiguous layout"
+    verify_package_signer "$THEME_CLIENT_PACKAGE" "theme client"
+    adb_device install -r "$THEME_CLIENT_APK" >/dev/null || die "theme-client update failed"
+  else
+    adb_device install "$THEME_CLIENT_APK" >/dev/null || die "theme-client installation failed"
+  fi
+  verify_package_signer "$THEME_CLIENT_PACKAGE" "theme client"
+  note "paired theme client installed and signer verified; no broker was launched"
 }
 
 deploy_with_mode() {
@@ -502,6 +546,7 @@ case "$1" in
   verify-clean) verify_clean ;;
   install-controller) install_controller ;;
   install-test-client) install_test_client ;;
+  install-theme-client) install_theme_client ;;
   deploy) deploy ;;
   deploy-system-theme) deploy_system_theme ;;
   deploy-colorblendr-shizuku) deploy_colorblendr_shizuku ;;
