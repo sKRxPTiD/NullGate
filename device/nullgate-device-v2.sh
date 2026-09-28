@@ -163,6 +163,42 @@ broker_pid() {
   adb_device shell "if test -L $DEVICE_DIR/broker.pid; then echo SYMLINK; elif test -f $DEVICE_DIR/broker.pid; then cat $DEVICE_DIR/broker.pid; elif test -e $DEVICE_DIR/broker.pid; then echo OTHER; else echo ABSENT; fi"     | tr -d '\r\n'
 }
 
+validated_stale_pid_receipt() {
+  local pid process_state pid_state
+  pid="$(broker_pid)" || die "PID state is UNKNOWN"
+  if [[ "$pid" == ABSENT ]]; then
+    printf 'ABSENT\n'
+    return
+  fi
+  [[ "$pid" =~ ^[1-9][0-9]{0,8}$ && "$pid" -gt 1 ]] \
+    || die "unsafe PID receipt; manual inspection required"
+  process_state="$(adb_device shell "if test -d /proc/$pid; then echo PRESENT; else echo ABSENT; fi")" \
+    || die "process inspection failed; state is UNKNOWN"
+  [[ "$process_state" == ABSENT ]] \
+    || die "recorded PID still exists; preserve receipt for inspection"
+  pid_state="$(adb_device shell "if test -L $DEVICE_DIR/broker.pid; then echo SYMLINK; elif test -f $DEVICE_DIR/broker.pid; then stat -c 'FILE:%u:%a' $DEVICE_DIR/broker.pid; else echo OTHER; fi" | tr -d '\r')"
+  [[ "$pid_state" == FILE:0:600 ]] || die "unsafe stale PID receipt: $pid_state"
+  printf '%s\n' "$pid"
+}
+
+remove_validated_stale_pid_receipt() {
+  local expected_pid="$1" current_pid process_state pid_state
+  if [[ "$expected_pid" == ABSENT ]]; then
+    return 0
+  fi
+  require_no_broker
+  process_state="$(adb_device shell "if test -d /proc/$expected_pid; then echo PRESENT; else echo ABSENT; fi")" \
+    || die "process inspection failed before PID receipt removal; state is UNKNOWN"
+  [[ "$process_state" == ABSENT ]] \
+    || die "recorded PID appeared during recovery; preserve receipt for inspection"
+  current_pid="$(broker_pid)" || die "PID state changed during recovery"
+  [[ "$current_pid" == "$expected_pid" ]] || die "PID receipt changed during recovery"
+  pid_state="$(adb_device shell "if test -L $DEVICE_DIR/broker.pid; then echo SYMLINK; elif test -f $DEVICE_DIR/broker.pid; then stat -c 'FILE:%u:%a' $DEVICE_DIR/broker.pid; else echo OTHER; fi" | tr -d '\r')"
+  [[ "$pid_state" == FILE:0:600 ]] || die "stale PID receipt became unsafe: $pid_state"
+  adb_device shell "rm -f $DEVICE_DIR/broker.pid" >/dev/null \
+    || die "PID receipt removal failed"
+}
+
 verify_process() {
   local pid="$1" cmdline uid_line
   [[ "$pid" =~ ^[1-9][0-9]{0,8}$ && "$pid" -gt 1 ]] || return 1
@@ -369,17 +405,9 @@ recover_marker_runtime() {
   platform_preflight
   require_private_runtime
   require_no_broker
-  local pid pid_state marker_list marker marker_path file_state content lease_id expiry process_state entries entry
+  local pid marker_list marker marker_path file_state content lease_id expiry entries entry
   local -a validated_markers=()
-  pid="$(broker_pid)" || die "PID state is UNKNOWN"
-  if [[ "$pid" != ABSENT ]]; then
-    [[ "$pid" =~ ^[1-9][0-9]{0,8}$ && "$pid" -gt 1 ]] \
-      || die "unsafe PID receipt; manual inspection required"
-    process_state="$(adb_device shell "if test -d /proc/$pid; then echo PRESENT; else echo ABSENT; fi")" || die "process inspection failed; state is UNKNOWN"
-    [[ "$process_state" == ABSENT ]] || die "recorded PID still exists; preserve receipt for inspection"
-    pid_state="$(adb_device shell "if test -L $DEVICE_DIR/broker.pid; then echo SYMLINK; elif test -f $DEVICE_DIR/broker.pid; then stat -c 'FILE:%u:%a' $DEVICE_DIR/broker.pid; else echo OTHER; fi" | tr -d '\r')"
-    [[ "$pid_state" == FILE:0:600 ]] || die "unsafe stale PID receipt: $pid_state"
-  fi
+  pid="$(validated_stale_pid_receipt)"
 
   marker_list="$(adb_device shell "if test -L $DEVICE_DIR/leases; then echo SYMLINK; elif test -d $DEVICE_DIR/leases; then find $DEVICE_DIR/leases -mindepth 1 -maxdepth 1 -printf '%f:%y\\n'; elif test -e $DEVICE_DIR/leases; then echo OTHER; else echo ABSENT; fi" | tr -d '\r')"
   [[ "$marker_list" != SYMLINK && "$marker_list" != OTHER ]] \
@@ -409,9 +437,7 @@ recover_marker_runtime() {
   for marker_path in "${validated_markers[@]}"; do
     adb_device shell "rm -f $marker_path" >/dev/null || die "marker removal failed"
   done
-  if [[ "$pid" != ABSENT ]]; then
-    adb_device shell "rm -f $DEVICE_DIR/broker.pid" >/dev/null || die "PID receipt removal failed"
-  fi
+  remove_validated_stale_pid_receipt "$pid"
   cleanup_runtime
 }
 
@@ -429,11 +455,20 @@ recover_system_theme_runtime() {
   platform_preflight
   require_private_runtime
   require_no_broker
-  [[ "$(broker_pid)" == ABSENT ]] || die "PID receipt remains; stop the broker before theme recovery"
-  local receipt_state temp_dir receipt kind snapshot current
+  local pid receipt_state temp_dir receipt kind snapshot current entries entry
+  pid="$(validated_stale_pid_receipt)"
   receipt_state="$(adb_device shell "if test -L $DEVICE_DIR/theme.snapshot; then echo SYMLINK; elif test -f $DEVICE_DIR/theme.snapshot; then stat -c 'FILE:%u:%a:%s' $DEVICE_DIR/theme.snapshot; elif test -e $DEVICE_DIR/theme.snapshot; then echo OTHER; else echo ABSENT; fi" | tr -d '\r')"
   [[ "$receipt_state" =~ ^FILE:0:600:([0-9]{1,5})$ ]] || die "theme recovery receipt is absent or unsafe: $receipt_state"
   (( BASH_REMATCH[1] <= 16400 )) || die "theme recovery receipt exceeds safety bound"
+  verify_no_leases
+  entries="$(adb_device shell "find $DEVICE_DIR -mindepth 1 -maxdepth 1 -printf '%f\n'" | tr -d '\r')" \
+    || die "runtime inventory failed"
+  while IFS= read -r entry; do
+    [[ -z "$entry" || "$entry" == broker.pid || "$entry" == NullGate-broker.jar \
+        || "$entry" == broker.log || "$entry" == leases || "$entry" == theme.snapshot ]] \
+      || die "unexpected runtime entry; refusing theme recovery: $entry"
+  done <<< "$entries"
+  require_no_broker
   temp_dir="$(mktemp -d)"
   receipt="$temp_dir/theme.snapshot"
   adb_device pull "$DEVICE_DIR/theme.snapshot" "$receipt" >/dev/null || { rm -rf -- "$temp_dir"; die "could not preserve theme recovery receipt"; }
@@ -456,6 +491,7 @@ recover_system_theme_runtime() {
   cp -- "$receipt" "$LOG_DIR/theme-recovery-$SERIAL-$(date -u +%Y%m%dT%H%M%SZ).snapshot"
   rm -rf -- "$temp_dir"
   adb_device shell "rm -f $DEVICE_DIR/theme.snapshot" >/dev/null || die "could not remove verified theme recovery receipt"
+  remove_validated_stale_pid_receipt "$pid"
   cleanup_runtime "$THEME_MUTATION_TOKEN"
   note "theme restored exactly from the root-owned receipt and runtime removed"
 }

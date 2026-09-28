@@ -203,6 +203,27 @@ run_theme_helper ready verify-clean >/dev/null
 set_state 1 1 1 0 0 0 0 0 1
 run_theme_helper theme-recovery-null recover-system-theme-runtime >/dev/null
 run_theme_helper ready verify-clean >/dev/null
+set_state 1 1 1 0 1 0 0 0 1
+run_theme_helper theme-recovery recover-system-theme-runtime >/dev/null
+run_theme_helper ready verify-clean >/dev/null
+set_state 1 1 1 0 1 0 0 0 1
+if output="$(run_theme_helper reused-pid recover-system-theme-runtime 2>&1)"; then
+  echo "theme recovery accepted a reused recorded PID" >&2; exit 1
+fi
+[[ "$output" == *"recorded PID still exists"* ]]
+[[ "$(cat "$STATE")" == *"pid_receipt=1"*"theme_snapshot=1"* ]]
+set_state 1 1 1 0 1 0 0 0 1
+if output="$(run_theme_helper pid-symlink recover-system-theme-runtime 2>&1)"; then
+  echo "theme recovery accepted a symlink PID receipt" >&2; exit 1
+fi
+[[ "$output" == *"unsafe PID receipt"* ]]
+[[ "$(cat "$STATE")" == *"pid_receipt=1"*"theme_snapshot=1"* ]]
+set_state 1 1 1 0 1 0 1 0 1
+if output="$(run_theme_helper theme-recovery recover-system-theme-runtime 2>&1)"; then
+  echo "theme recovery accepted an unexpected runtime entry" >&2; exit 1
+fi
+[[ "$output" == *"unexpected runtime entry"* ]]
+[[ "$(cat "$STATE")" == *"pid_receipt=1"*"unknown=1"*"theme_snapshot=1"* ]]
 set_state 1 1 1 0 0 0 0 0 1
 if output="$(run_theme_helper theme-recovery-readback-fail recover-system-theme-runtime 2>&1)"; then
   echo "mismatched theme recovery readback was accepted" >&2; exit 1

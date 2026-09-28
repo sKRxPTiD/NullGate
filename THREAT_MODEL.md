@@ -42,7 +42,8 @@ signers and signing-key rotation are unsupported and denied.
 - Durable controller recovery record before transmit; serialized requests;
   ambiguous replies and NOT_FOUND remain unconfirmed, not asserted safe.
 - Runtime root-only leaf directories; exclusive no-follow marker/PID creation;
-  stale marker refusal; shutdown hook plus elapsed-clock watchdog.
+  stale marker refusal; guarded stale-PID reconciliation; shutdown hook plus
+  elapsed-clock watchdog.
 - Signing files mode 0600, containing directory mode 0700; incomplete key pair
   fails rather than generating a replacement identity.
 

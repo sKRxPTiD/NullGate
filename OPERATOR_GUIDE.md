@@ -47,9 +47,10 @@ Choose **Show status** first. Never assume an empty-looking app means the root
 broker is gone. If the broker has stopped or its 15-minute lifetime expired but
 the runtime remains, choose **Recover verified stale runtime**. Recovery refuses
 a live process, unsafe ownership or permissions, unexpected files, malformed
-markers, and unknown process state. It restores from the validated theme
-snapshot when one exists, or uses the no-lease cleanup path when no snapshot
-was ever created.
+markers, PID reuse, and unknown process state. A stale root-owned PID receipt
+left by a forced broker exit is revalidated and removed only after recovery is
+otherwise complete. Recovery restores from the validated theme snapshot when
+one exists, or uses the no-lease cleanup path when no snapshot was ever created.
 
 If recovery refuses, stop there and return to Codex. Do not manually delete
 `/data/local/tmp/nullgate`.
