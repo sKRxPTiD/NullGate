@@ -18,7 +18,7 @@ one_value() {
 manifest_code="$(one_value "$(sed -n 's/.*android:versionCode="\([0-9][0-9]*\)".*/\1/p' "$MANIFEST")" "manifest version code")"
 manifest_name="$(one_value "$(sed -n 's/.*android:versionName="\([^"]*\)".*/\1/p' "$MANIFEST")" "manifest version name")"
 manifest_label="$(one_value "$(sed -n 's/.*android:label="\([^"]*\)".*/\1/p' "$MANIFEST")" "manifest application label")"
-build_code="$(one_value "$(sed -n 's/^verify_manifest_identity .* org\.nullprotocol\.nullgate \([0-9][0-9]*\)$/\1/p' "$BUILD")" "build version pin")"
+build_code="$(one_value "$(sed -n 's/^DEFAULT_CONTROLLER_VERSION_CODE=\([0-9][0-9]*\)$/\1/p' "$BUILD")" "build version pin")"
 helper_code="$(one_value "$(sed -n 's/^CONTROLLER_VERSION_CODE="\([0-9][0-9]*\)"$/\1/p' "$HELPER")" "device-helper version pin")"
 private_code="$(one_value "$(sed -n 's/^controller\.versionCode=\([0-9][0-9]*\)$/\1/p' "$PINS")" "private launcher version pin")"
 
@@ -26,7 +26,7 @@ private_code="$(one_value "$(sed -n 's/^controller\.versionCode=\([0-9][0-9]*\)$
   || die "source version mismatch: manifest=$manifest_code build=$build_code helper=$helper_code"
 (( private_code <= manifest_code )) \
   || die "deployed private baseline cannot be newer than active source: private=$private_code source=$manifest_code"
-[[ "$manifest_name" == "0.2.0" ]] || die "unexpected source version name: $manifest_name"
+[[ "$manifest_name" == "0.3.0" ]] || die "unexpected source version name: $manifest_name"
 [[ "$manifest_label" == "NullGate" ]] || die "unexpected application label: $manifest_label"
 
 if [[ "${1:-}" == --with-apk ]]; then

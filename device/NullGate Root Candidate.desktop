@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=NullGate · Root Candidate (Debug)
+Comment=Manual app root switch; applied colors stay after OFF
+Exec=env NULLGATE_ROOT_PACKAGE=org.nullprotocol.nullgate.rootcandidate bash "/mnt/TerraDrive/Null Protocol/Apps/NullGate/source/device/nullgate-root-menu.sh" menu
+Icon=/mnt/TerraDrive/Null Protocol/Apps/NullGate/source/res/drawable-nodpi/nullgate_launcher_icon.png
+Terminal=true
+Categories=Utility;
+StartupNotify=true

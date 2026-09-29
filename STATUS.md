@@ -1,4 +1,46 @@
-# NullGate status — 2026-09-28
+# NullGate status — 2026-09-29
+
+## Active source and PiXi install: NullGate 0.3.0 root switch
+
+The project directive is choose app → root ON → open app → make changes →
+close app → root OFF. Applied changes persist. Prior temporary-theme results
+below do not satisfy that directive and are retained as legacy test history.
+
+The default source build and installed `org.nullprotocol.nullgate` now use the
+non-debuggable root-switch screen (version code 4). The signed 0.3.0 upgrade
+was installed over 0.2.0 without clearing app data. Its root switch opened
+ColorBlendr's real root service; OFF killed that service, and the applied
+system color remained. The paired debug candidate also passed wrong-UID denial,
+abrupt broker-loss cleanup and guarded receipt recovery. The existing artwork
+is unchanged.
+
+The default signed production build is in `dist/`. A separate private 0.3.0
+release is packaged from a committed source snapshot under ignored
+`dist/release-candidate/0.3.0-<source-commit>/`. The earlier operations-only
+staging remains under `dist/release-candidate/0.3.0/` as historical evidence.
+The private integration patch is saved in
+`integrations/patches/v3-0003-Add-NullGate-manual-root-bridge.patch`.
+The immutable 0.1 and 0.2 release bundles are preserved.
+
+The **NullGate · PiXi Root Switch** desktop shortcut is the active host
+launcher. The existing **NullGate · PiXi** shortcut remains the historical
+theme workflow. PiXi has no app-callable `su`, so host bootstrap remains
+necessary after reboot;
+generic APK compatibility requires client integration rather than more lease
+adapters. The upstream maintainer's response is not implied by private testing.
+Keep rooted ADB on during a session: a tested non-root adbd restart ended the
+broker, correctly producing unavailable/unknown status. Clean Stop must precede
+disabling rooted debugging; a host-independent daemon lifetime remains unimplemented.
+
+The ColorBlendr and production-controller integration is verified through the
+complete phone switch flow. The final 0.3.0 private release contains signed
+runtime artifacts, operator records and the exact committed source archive.
+It is additive to the historical bundles. Signing secrets are excluded.
+
+See `root-client/VALIDATION.md` and `root-client/USAGE.md` for the current evidence
+and simple operating directions.
+
+## Legacy state as recorded on 2026-09-28
 
 ## PiXi private MVP: complete
 

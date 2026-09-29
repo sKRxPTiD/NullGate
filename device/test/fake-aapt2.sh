@@ -2,7 +2,7 @@
 set -euo pipefail
 [[ "${1:-}" == dump && "${2:-}" == badging && -n "${3:-}" ]] || exit 64
 package=org.nullprotocol.nullgate
-version=3
+version=4
 if [[ "$3" == *NullGate-test-client-debug.apk ]]; then
   package=org.nullprotocol.nullgate.testclient
   version=1

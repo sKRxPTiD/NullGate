@@ -1,5 +1,18 @@
 # NullGate operator guide — PiXi prototype
 
+## Corrected root-switch workflow — 2026-09-29
+
+NullGate 0.3.0 is the active production workflow. Use
+[root-client/USAGE.md](root-client/USAGE.md): choose an integrated app, turn
+root ON, make and apply changes, close the app, then turn root OFF. **Applied
+changes stay.** The release bundle is private; the immutable historical
+bundles remain unchanged.
+
+The remainder of this guide describes the legacy temporary-theme product.
+Do not use its lease/restore directions for the root switch.
+Use DoloWOLF's **NullGate · PiXi Root Switch** shortcut. The older
+**NullGate · PiXi** desktop launcher still starts the legacy workflow.
+
 ## What works now
 
 NullGate can run a temporary root broker launched from DoloWOLF and grant the

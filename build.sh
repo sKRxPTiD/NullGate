@@ -14,17 +14,28 @@ KEYPASS_FILE="${NULLGATE_KEYPASS_FILE:-$KEYPASS_FILE}"
 RUN_DEVICE_HARNESS=1
 INIT_DEV_SIGNING=0
 PREFLIGHT_ONLY=0
+ROOT_SESSION_CANDIDATE=0
+ROOT_SESSION_RELEASE=0
+DEFAULT_CONTROLLER_VERSION_CODE=4
 REPRODUCIBLE_EPOCH=946684800
 export TZ=UTC
 
 usage() {
   cat <<'EOF'
-Usage: ./build.sh [--preflight] [--host-only] [--init-dev-signing]
+Usage: ./build.sh [--preflight] [--host-only] [--root-session-candidate|--root-session-release] [--init-dev-signing]
+
+The default build produces the 0.3.0 manual root-switch controller.
 
   --preflight          Validate dependencies, metadata, and the selected
                        signing identity without writing build output.
   --host-only          Build and verify host artifacts without the simulated
                        device-helper suite.
+  --root-session-candidate
+                       Build the root-switch candidate into separate output
+                       directories, preserving the existing distribution.
+  --root-session-release
+                       Build the non-debuggable root-switch controller as a
+                       separate private upgrade set, preserving existing outputs.
   --init-dev-signing   Explicitly create the local development signing
                        identity when neither signing file exists.
 EOF
@@ -37,6 +48,20 @@ while (($#)); do
       ;;
     --host-only)
       RUN_DEVICE_HARNESS=0
+      ;;
+    --root-session-candidate)
+      if ((ROOT_SESSION_RELEASE)); then echo "Choose one root session build mode." >&2; exit 2; fi
+      ROOT_SESSION_CANDIDATE=1
+      RUN_DEVICE_HARNESS=0
+      OUT_DIR="$BASE_DIR/build/root-session-candidate"
+      DIST_DIR="$BASE_DIR/dist/root-session-candidate"
+      ;;
+    --root-session-release)
+      if ((ROOT_SESSION_CANDIDATE)); then echo "Choose one root session build mode." >&2; exit 2; fi
+      ROOT_SESSION_RELEASE=1
+      RUN_DEVICE_HARNESS=0
+      OUT_DIR="$BASE_DIR/build/root-session-release"
+      DIST_DIR="$BASE_DIR/dist/root-session-release"
       ;;
     --init-dev-signing)
       INIT_DEV_SIGNING=1
@@ -135,19 +160,41 @@ bash "$BASE_DIR/test-client/test.sh"
 bash "$BASE_DIR/theme-client/test.sh"
 bash "$BASE_DIR/broker/test.sh"
 
-rm -rf "$OUT_DIR" "$DIST_DIR"
+# Clean only generated compiler products. Keep staged release bundles and
+# separately built candidates even when rebuilding the default distribution.
+for generated_dir in compiled-res classes dex broker-classes broker-dex client-reference \
+  test-client-classes test-client-dex theme-client-classes theme-client-dex root-client-reference; do
+  rm -rf -- "$OUT_DIR/$generated_dir"
+done
+for generated_file in base.apk aligned.apk test-client-base.apk test-client-aligned.apk \
+  theme-client-base.apk theme-client-aligned.apk; do
+  rm -f -- "$OUT_DIR/$generated_file"
+done
+for generated_file in NullGate-prototype-debug.apk NullGate-test-client-debug.apk \
+  NullGate-theme-client-debug.apk NullGate-broker.jar controller-cert-sha256.txt SHA256SUMS \
+  NullGate-prototype-debug.apk.idsig NullGate-test-client-debug.apk.idsig NullGate-theme-client-debug.apk.idsig; do
+  rm -f -- "$DIST_DIR/$generated_file"
+done
 mkdir -p "$OUT_DIR/compiled-res" "$OUT_DIR/classes" "$OUT_DIR/dex" "$OUT_DIR/broker-classes" \
   "$OUT_DIR/broker-dex" "$OUT_DIR/client-reference" "$OUT_DIR/test-client-classes" \
   "$OUT_DIR/test-client-dex" "$OUT_DIR/theme-client-classes" \
-  "$OUT_DIR/theme-client-dex" "$DIST_DIR" "$KEY_DIR"
+  "$OUT_DIR/theme-client-dex" "$OUT_DIR/root-client-reference" "$DIST_DIR" "$KEY_DIR"
 
 "$BUILD_TOOLS/aapt2" compile --dir "$BASE_DIR/res" -o "$OUT_DIR/compiled-res"
-"$BUILD_TOOLS/aapt2" link --manifest "$BASE_DIR/AndroidManifest.xml" \
+CONTROLLER_MANIFEST="$BASE_DIR/AndroidManifest.xml"
+if ((ROOT_SESSION_CANDIDATE)); then
+  CONTROLLER_MANIFEST="$BASE_DIR/root-client/AndroidManifest.xml"
+elif ((ROOT_SESSION_RELEASE)); then
+  CONTROLLER_MANIFEST="$BASE_DIR/root-client/AndroidManifest.production.xml"
+fi
+"$BUILD_TOOLS/aapt2" link --manifest "$CONTROLLER_MANIFEST" \
   -I "$ANDROID_JAR" --min-sdk-version 26 --target-sdk-version 36 \
   -o "$OUT_DIR/base.apk" "$OUT_DIR/compiled-res"/*.flat
 
 mapfile -d '' -t controller_sources < <(find "$BASE_DIR/common/src" "$BASE_DIR/src" \
   -name '*.java' -print0 | sort -z)
+mapfile -d '' -t bridge_sources < <(find "$BASE_DIR/root-client/src" -name '*.java' -print0 | sort -z)
+controller_sources+=("${bridge_sources[@]}")
 javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/classes" "${controller_sources[@]}"
 mapfile -d '' -t controller_classes < <(find "$OUT_DIR/classes" -name '*.class' -print0 | sort -z)
 "$BUILD_TOOLS/d8" --min-api 26 --lib "$ANDROID_JAR" --output "$OUT_DIR/dex" \
@@ -160,6 +207,13 @@ mapfile -d '' -t reference_sources < <(find "$BASE_DIR/client/reference" \
   -name '*.java' -print0 | sort -z)
 javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/client-reference" \
   "${reference_sources[@]}"
+
+# Check the Java-only libsu shell bridge against Android without adding a native binary.
+mapfile -d '' -t root_client_sources < <(find "$BASE_DIR/root-client/src" -name '*.java' -print0 | sort -z)
+javac --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/root-client-reference" \
+  "$BASE_DIR/common/src/org/nullprotocol/nullgate/protocol/RootSessionProtocol.java" \
+  "$BASE_DIR/common/src/org/nullprotocol/nullgate/protocol/RootShellProtocol.java" \
+  "${root_client_sources[@]}"
 
 # Build the first-party external-app harness as a separate package and UID.
 "$BUILD_TOOLS/aapt2" link --manifest "$BASE_DIR/test-client/AndroidManifest.xml" \
@@ -222,10 +276,26 @@ verify_manifest_identity() {
   [[ "$badging" == *"name='$expected_package'"* && "$badging" == *"versionCode='$expected_version'"* ]] || { echo "Unexpected packaged identity: $apk" >&2; exit 1; }
   "$BUILD_TOOLS/aapt2" dump permissions "$apk" | grep -Fqx "uses-permission: name='android.permission.HIDE_OVERLAY_WINDOWS'" || { echo "Overlay protection permission missing: $apk" >&2; exit 1; }
 }
-verify_manifest_identity "$DIST_DIR/NullGate-prototype-debug.apk" org.nullprotocol.nullgate 3
+if ((ROOT_SESSION_CANDIDATE)); then
+  verify_manifest_identity "$DIST_DIR/NullGate-prototype-debug.apk" org.nullprotocol.nullgate.rootcandidate 4
+elif ((ROOT_SESSION_RELEASE)); then
+  verify_manifest_identity "$DIST_DIR/NullGate-prototype-debug.apk" org.nullprotocol.nullgate 4
+else
+  verify_manifest_identity "$DIST_DIR/NullGate-prototype-debug.apk" org.nullprotocol.nullgate "$DEFAULT_CONTROLLER_VERSION_CODE"
+fi
 verify_manifest_identity "$DIST_DIR/NullGate-test-client-debug.apk" org.nullprotocol.nullgate.testclient 1
 verify_manifest_identity "$DIST_DIR/NullGate-theme-client-debug.apk" org.nullprotocol.nullgate.themeclient 1
-bash "$BASE_DIR/release/check-release-metadata.sh" --with-apk
+if ((ROOT_SESSION_CANDIDATE)); then
+  "$BUILD_TOOLS/aapt2" dump badging "$DIST_DIR/NullGate-prototype-debug.apk" \
+    | sed -n '1p' | grep -F "versionName='0.3.0-root-candidate'" >/dev/null
+elif ((ROOT_SESSION_RELEASE)); then
+  "$BUILD_TOOLS/aapt2" dump badging "$DIST_DIR/NullGate-prototype-debug.apk" \
+    | sed -n '1p' | grep -F "versionName='0.3.0'" >/dev/null
+else
+  "$BUILD_TOOLS/aapt2" dump badging "$DIST_DIR/NullGate-prototype-debug.apk" \
+    | sed -n '1p' | grep -F "versionName='0.3.0'" >/dev/null
+  bash "$BASE_DIR/release/check-release-metadata.sh" --with-apk
+fi
 
 mapfile -d '' -t broker_sources < <(find "$BASE_DIR/common/src" "$BASE_DIR/broker/src" \
   "$BASE_DIR/broker/android" -name '*.java' -print0 | sort -z)

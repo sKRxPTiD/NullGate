@@ -14,7 +14,7 @@ CHECKSUM_FILE="$BASE_DIR/dist/SHA256SUMS"
 PACKAGE="org.nullprotocol.nullgate"
 TEST_CLIENT_PACKAGE="org.nullprotocol.nullgate.testclient"
 THEME_CLIENT_PACKAGE="org.nullprotocol.nullgate.themeclient"
-CONTROLLER_VERSION_CODE="3"
+CONTROLLER_VERSION_CODE="4"
 TEST_CLIENT_VERSION_CODE="1"
 THEME_CLIENT_VERSION_CODE="1"
 BROKER_CLASS="org.nullprotocol.nullgate.broker.NullGateBrokerMain"
@@ -97,6 +97,8 @@ require_no_broker() {
     || die "process inventory unavailable or timed out; state is UNKNOWN"
   [[ -n "$processes" ]] || die "empty process inventory; state is UNKNOWN"
   [[ "$processes" != *"$BROKER_CLASS"* ]] || die "broker is still running; stop before cleanup or deployment"
+  [[ "$processes" != *"org.nullprotocol.nullgate.broker.RootBrokerMain"* ]] \
+    || die "the root-switch broker is running; close it before a legacy deployment"
 }
 
 platform_preflight() {

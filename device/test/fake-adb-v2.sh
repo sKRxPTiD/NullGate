@@ -113,7 +113,7 @@ case "$request" in
   "shell dumpsys package org.nullprotocol.nullgate")
     if [[ "$installed" == 1 ]]; then
       if [[ "$scenario" == old-controller ]]; then echo '  versionCode=2 minSdk=26 targetSdk=36'
-      else echo '  versionCode=3 minSdk=26 targetSdk=36'; fi
+      else echo '  versionCode=4 minSdk=26 targetSdk=36'; fi
     fi ;;
   "shell cmd package list packages -U org.nullprotocol.nullgate")
     printf '%s\n' 'package:org.nullprotocol.nullgate uid:10258' \

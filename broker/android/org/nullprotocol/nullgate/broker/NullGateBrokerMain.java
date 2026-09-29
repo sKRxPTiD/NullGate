@@ -39,6 +39,8 @@ public final class NullGateBrokerMain {
             throw new SecurityException("unknown broker mode");
         if (android.os.Process.myUid() != 0) throw new SecurityException("broker requires root");
         RuntimeFiles.requirePrivateDirectory(RuntimeFiles.ROOT);
+        if (new File("/data/local/tmp/nullgate-root/root-broker.pid").exists())
+            throw new SecurityException("close the root switch session before starting the legacy broker");
         if (new File(RuntimeFiles.ROOT, "theme.snapshot").exists())
             throw new SecurityException("stale theme snapshot requires host recovery");
         File leaseDirectory = new File(RuntimeFiles.ROOT, "leases");

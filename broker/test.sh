@@ -21,3 +21,5 @@ java -cp "$TEST_OUT" org.nullprotocol.nullgate.broker.SystemThemeSeedAdapterTest
 java -cp "$TEST_OUT" org.nullprotocol.nullgate.broker.BoundedInputTest
 java -cp "$TEST_OUT" org.nullprotocol.nullgate.broker.BoundedProcessRunnerTest
 java -cp "$TEST_OUT" org.nullprotocol.nullgate.broker.SecurityRegressionTest
+java -cp "$TEST_OUT" org.nullprotocol.nullgate.broker.RootSessionEngineTest
+java -cp "$TEST_OUT" org.nullprotocol.nullgate.broker.RootSessionProtocolTest

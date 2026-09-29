@@ -1,5 +1,30 @@
 # NullGate
 
+## Current directive — 2026-09-29
+
+NullGate gives a selected, integrated app root access while its switch is ON.
+Make changes inside that app, close it, then switch root OFF. **The changes
+stay; the app's root access stops.** There is no theme lease or automatic theme
+restoration in this workflow. Colors, circuit artwork and microchip branding
+are retained.
+
+NullGate 0.3.0 is now the normal source build and canonical package. Its
+non-debuggable production app upgrades the existing signed NullGate install.
+ColorBlendr's actual root service, color application, OFF cleanup and retained
+color passed on PiXi. The debug package remains available separately.
+Use [the root-switch guide](root-client/USAGE.md),
+[implementation notes](root-client/README.md) and
+[validation record](root-client/VALIDATION.md). Other apps need the NullGate
+root bridge; selecting an arbitrary unmodified APK does not supply it a `su`
+binary. PiXi requires DoloWOLF to start the broker after reboot and to keep
+Rooted debugging enabled until clean Stop.
+
+The default build and user workflow are the **manual root switch**. The
+sections below describe the **legacy typed-theme implementation**. Its
+tests and immutable bundles remain historical evidence, not the corrected
+root-switch product's acceptance claim. Version 0.2.0 release bundles are
+preserved as immutable historical artifacts.
+
 **Security research prototype — not a production root solution.**
 
 NullGate is Null Protocol's typed, temporary-privilege broker for Android. It
@@ -15,7 +40,7 @@ case baked into the broker.
 The controller uses green circuit branding and the ∅ mark over a cappuccino
 palette.
 
-## Current result — 2026-09-28
+## Historical 0.2.0 result — 2026-09-28
 
 The signed controller and separate Android broker build locally. The marker
 lease and native 60-second theme lease have both passed supervised PiXi tests,

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=NullGate · PiXi Root Switch
+Comment=Choose an app, turn root on for changes, then turn it off
+Exec=env NULLGATE_ROOT_PACKAGE=org.nullprotocol.nullgate bash "/mnt/TerraDrive/Null Protocol/Apps/NullGate/source/device/nullgate-root-menu.sh" menu
+Icon=/mnt/TerraDrive/Null Protocol/Apps/NullGate/source/res/drawable-nodpi/nullgate_launcher_icon.png
+Terminal=true
+Categories=Utility;
+StartupNotify=true

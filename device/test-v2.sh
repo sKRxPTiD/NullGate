@@ -167,7 +167,7 @@ set_state 1
 if output="$(run_theme_client_helper old-controller install-theme-client 2>&1)"; then
   echo "theme-client installation accepted the old controller" >&2; exit 1
 fi
-[[ "$output" == *"requires the reviewed controller version 3"* ]]
+[[ "$output" == *"requires the reviewed controller version 4"* ]]
 set_state
 if output="$(run_theme_client_helper ready install-theme-client 2>&1)"; then
   echo "theme-client installation accepted a missing controller" >&2; exit 1

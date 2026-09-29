@@ -1,0 +1,469 @@
+Private NullGate manual-root candidate; not an upstream maintainer response.
+Base: 630028f4267218b6d894395ba0a9e1aa4869de6a (pixi-private-nullgate)
+
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index 807d512..2048ce3 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -20,8 +20,8 @@ configure<ApplicationExtension> {
+     defaultConfig {
+         minSdk = 31
+         targetSdk = 36
+-        versionCode = 42001
+-        versionName = "v3.0.1-nullgate.1"
++        versionCode = 42002
++        versionName = "v3.0.1-nullgate-root.2"
+ 
+         ndk {
+             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64"))
+diff --git a/app/src/main/java/com/drdisagree/colorblendr/ColorBlendr.kt b/app/src/main/java/com/drdisagree/colorblendr/ColorBlendr.kt
+index e3452a6..156de2f 100644
+--- a/app/src/main/java/com/drdisagree/colorblendr/ColorBlendr.kt
++++ b/app/src/main/java/com/drdisagree/colorblendr/ColorBlendr.kt
+@@ -8,6 +8,9 @@ import com.drdisagree.colorblendr.service.IRootConnection
+ import com.drdisagree.colorblendr.service.IShizukuConnection
+ import com.drdisagree.colorblendr.utils.app.CrashLogger
+ import com.google.android.material.color.DynamicColors
++import com.topjohnwu.superuser.Shell
++import com.drdisagree.colorblendr.data.common.Utilities
++import com.drdisagree.colorblendr.data.enums.WorkMethod
+ import io.github.muntashirakon.adb.PRNGFixes
+ import org.lsposed.hiddenapibypass.HiddenApiBypass
+ import java.lang.ref.WeakReference
+@@ -18,6 +21,21 @@ class ColorBlendr : Application() {
+         super.onCreate()
+         instance = this
+         contextReference = WeakReference(applicationContext)
++        if (android.os.Process.myUid() != 0) {
++            val apk = "'" + applicationInfo.sourceDir.replace("'", "'\\''") + "'"
++            Shell.setDefaultBuilder(
++                Shell.Builder.create().setContext(this).setTimeout(5).setCommands(
++                    "/system/bin/sh", "-c",
++                    "CLASSPATH=$apk exec /system/bin/app_process /system/bin " +
++                        "org.nullprotocol.nullgate.rootclient.RootShellMain"
++                )
++            )
++            // The private root candidate replaces the former temporary theme work method.
++            if (Utilities.isNullGateMode()) {
++                Utilities.setWorkingMethod(WorkMethod.ROOT)
++                com.drdisagree.colorblendr.data.common.Constant.WORKING_METHOD = WorkMethod.ROOT
++            }
++        }
+         DynamicColors.applyToActivitiesIfAvailable(this)
+         PRNGFixes.apply()
+         CrashLogger.install(this)
+@@ -63,4 +81,4 @@ class ColorBlendr : Application() {
+         val shizukuConnection: IShizukuConnection?
+             get() = ShizukuConnectionProvider.getServiceProvider
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/app/src/main/java/com/drdisagree/colorblendr/provider/RootConnectionProvider.kt b/app/src/main/java/com/drdisagree/colorblendr/provider/RootConnectionProvider.kt
+index 331ff67..ac4d659 100644
+--- a/app/src/main/java/com/drdisagree/colorblendr/provider/RootConnectionProvider.kt
++++ b/app/src/main/java/com/drdisagree/colorblendr/provider/RootConnectionProvider.kt
+@@ -14,6 +14,7 @@ import com.drdisagree.colorblendr.data.common.Utilities.rootModeSelected
+ import com.drdisagree.colorblendr.service.IRootConnection
+ import com.drdisagree.colorblendr.service.RootConnection
+ import com.topjohnwu.superuser.ipc.RootService
++import com.topjohnwu.superuser.Shell
+ import kotlinx.coroutines.CoroutineScope
+ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.launch
+@@ -25,18 +26,29 @@ class RootConnectionProvider private constructor(private val context: Context) :
+ 
+     private var onSuccess: (() -> Unit)? = null
+     private var onFailure: (() -> Unit)? = null
++    private val serviceReady = CountDownLatch(1)
+ 
+     private fun bindServiceConnection() {
+         if (isServiceConnected) {
+-            mServiceConnectionTimer.countDown()
++            serviceReady.countDown()
+             return
+         }
+ 
+         CoroutineScope(Dispatchers.Main).launch {
+-            RootService.bind(
+-                Intent(context, RootConnection::class.java),
+-                this@RootConnectionProvider
+-            )
++            try {
++                val shell = withContext(Dispatchers.IO) { Shell.getShell() }
++                check(shell.isRoot) { "NullGate has not granted a root shell" }
++                // bind() probes for a global su binary before consulting the custom shell.
++                val task = RootService.bindOrTask(
++                    Intent(context, RootConnection::class.java),
++                    androidx.core.content.ContextCompat.getMainExecutor(context),
++                    this@RootConnectionProvider
++                )
++                if (task != null) withContext(Dispatchers.IO) { shell.execTask(task) }
++            } catch (failed: Exception) {
++                Log.w(TAG, "NullGate root connection is unavailable", failed)
++                serviceReady.countDown()
++            }
+         }
+     }
+ 
+@@ -48,7 +60,7 @@ class RootConnectionProvider private constructor(private val context: Context) :
+ 
+         serviceProvider = IRootConnection.Stub.asInterface(binder)
+         isServiceConnected = true
+-        mServiceConnectionTimer.countDown()
++        serviceReady.countDown()
+         Log.i(TAG, "Service connected")
+     }
+ 
+@@ -63,7 +75,7 @@ class RootConnectionProvider private constructor(private val context: Context) :
+         return withContext(Dispatchers.IO) {
+             try {
+                 bindServiceConnection()
+-                mServiceConnectionTimer.await(10, TimeUnit.SECONDS)
++                serviceReady.await(10, TimeUnit.SECONDS) && isServiceConnected
+             } catch (e: Exception) {
+                 Log.e(TAG, "Error starting service connection", e)
+                 false
+@@ -103,7 +115,6 @@ class RootConnectionProvider private constructor(private val context: Context) :
+         private val TAG: String = RootConnectionProvider::class.java.simpleName
+         private var serviceProvider: IRootConnection? = null
+         private var isServiceConnected = false
+-        private val mServiceConnectionTimer = CountDownLatch(1)
+ 
+         fun builder(context: Context): Builder {
+             return Builder(context)
+diff --git a/app/src/main/java/com/drdisagree/colorblendr/ui/compose/navigation/AppNavHost.kt b/app/src/main/java/com/drdisagree/colorblendr/ui/compose/navigation/AppNavHost.kt
+index 740d4c9..501ce9e 100644
+--- a/app/src/main/java/com/drdisagree/colorblendr/ui/compose/navigation/AppNavHost.kt
++++ b/app/src/main/java/com/drdisagree/colorblendr/ui/compose/navigation/AppNavHost.kt
+@@ -25,6 +25,7 @@ import com.drdisagree.colorblendr.R
+ import com.drdisagree.colorblendr.data.common.Constant.WORKING_METHOD
+ import com.drdisagree.colorblendr.data.common.Utilities.isFirstRun
+ import com.drdisagree.colorblendr.data.common.Utilities.isWorkMethodUnknown
++import com.drdisagree.colorblendr.data.enums.WorkMethod
+ import com.drdisagree.colorblendr.data.common.Utilities.setFirstRunCompleted
+ import com.drdisagree.colorblendr.data.common.Utilities.setWorkingMethod
+ import com.drdisagree.colorblendr.data.domain.RefreshCoordinator
+@@ -148,14 +149,8 @@ fun AppNavHost(
+     }
+ 
+     fun checkNullGateConnection() {
+-        if (NullGateThemeClient.trustedControllerInstalled(context)) {
+-            onboardingAction = OnboardingActionState.Connecting
+-            goToHome()
+-        } else {
+-            onboardingAction = OnboardingActionState.Error(
+-                context.getString(R.string.nullgate_service_not_found)
+-            )
+-        }
++        WORKING_METHOD = WorkMethod.ROOT
++        checkRootConnection()
+     }
+ 
+     fun AnimatedContentTransitionScope<NavBackStackEntry>.enter(): EnterTransition =
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index a0ee73e..e35e472 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -254,7 +254,7 @@
+     <string name="mode_three_title">Wireless ADB</string>
+     <string name="mode_three_desc">Use ADB via Wireless Debugging. Limited customization options will be available.</string>
+     <string name="mode_four_title" translatable="false">NullGate</string>
+-    <string name="mode_four_desc" translatable="false">Request narrow, temporary theme leases from the trusted NullGate controller. ColorBlendr receives no root shell.</string>
++    <string name="mode_four_desc" translatable="false">Use the existing root features while NullGate’s root switch is ON. Switch it OFF when finished; your applied colors stay.</string>
+     <string name="nullgate_service_not_found" translatable="false">The trusted NullGate controller is not installed.</string>
+     <string name="error_nullgate_unavailable" translatable="false">NullGate is unavailable, another request is active, or ColorBlendr is not in the foreground.</string>
+     <string name="shizuku_service_not_found">Shizuku permission not granted.</string>
+diff --git a/libadb/build.gradle b/libadb/build.gradle
+index 4b138ad..ea99c4e 100644
+--- a/libadb/build.gradle
++++ b/libadb/build.gradle
+@@ -8,7 +8,7 @@ group = 'io.github.muntashirakon'
+ version = '3.1.0'
+ 
+ android {
+-    compileSdk = 35
++    compileSdk = 36
+     namespace = "io.github.muntashirakon.adb"
+ 
+     defaultConfig {
+diff --git a/materialcolorutilities/build.gradle.kts b/materialcolorutilities/build.gradle.kts
+index a2cd006..589ccd5 100644
+--- a/materialcolorutilities/build.gradle.kts
++++ b/materialcolorutilities/build.gradle.kts
+@@ -41,4 +41,4 @@ dependencies {
+     implementation(libs.core.ktx)
+     implementation(libs.appcompat)
+     implementation(libs.material)
+-}
+\ No newline at end of file
++}
+diff --git a/systemstubs/build.gradle.kts b/systemstubs/build.gradle.kts
+index a2b508a..f21605f 100644
+--- a/systemstubs/build.gradle.kts
++++ b/systemstubs/build.gradle.kts
+@@ -5,7 +5,7 @@ plugins {
+ android {
+     namespace = "com.drdisagree.colorblendr.systemstubs"
+     //noinspection GradleDependency
+-    compileSdk = 34
++    compileSdk = 36
+ 
+     defaultConfig {
+         minSdk = 31
+@@ -33,4 +33,4 @@ android {
+ 
+ dependencies {
+     implementation(libs.annotation)
+-}
+\ No newline at end of file
++}
+diff --git a/app/src/debug/AndroidManifest.xml b/app/src/debug/AndroidManifest.xml
+new file mode 100644
+index 0000000..1b8fb6c
+--- /dev/null
++++ b/app/src/debug/AndroidManifest.xml
+@@ -0,0 +1,5 @@
++<manifest xmlns:android="http://schemas.android.com/apk/res/android">
++    <instrumentation
++        android:name="com.drdisagree.colorblendr.utils.nullgate.RootRuntimeChecks"
++        android:targetPackage="com.drdisagree.colorblendr" />
++</manifest>
+diff --git a/app/src/debug/java/com/drdisagree/colorblendr/utils/nullgate/RootRuntimeChecks.kt b/app/src/debug/java/com/drdisagree/colorblendr/utils/nullgate/RootRuntimeChecks.kt
+new file mode 100644
+index 0000000..31f3412
+--- /dev/null
++++ b/app/src/debug/java/com/drdisagree/colorblendr/utils/nullgate/RootRuntimeChecks.kt
+@@ -0,0 +1,43 @@
++package com.drdisagree.colorblendr.utils.nullgate
++
++import android.app.Activity
++import android.app.Instrumentation
++import android.content.ComponentName
++import android.content.Intent
++import android.content.ServiceConnection
++import android.os.Bundle
++import android.os.IBinder
++import com.drdisagree.colorblendr.service.IRootConnection
++import com.drdisagree.colorblendr.service.RootConnection
++import com.topjohnwu.superuser.ipc.RootService
++import com.drdisagree.colorblendr.provider.RootConnectionProvider
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.TimeUnit
++
++/** Debug-only check of ColorBlendr's actual root Binder, using harmless identity commands. */
++class RootRuntimeChecks : Instrumentation() {
++    private var arguments: Bundle? = null
++    override fun onCreate(arguments: Bundle?) { this.arguments = arguments; start() }
++    override fun onStart() {
++        val ready = CountDownLatch(1)
++        val result = Bundle()
++        try {
++            RootConnectionProvider.builder(targetContext)
++                .onSuccess { ready.countDown() }.onFailure { ready.countDown() }.run()
++            check(ready.await(15, TimeUnit.SECONDS)) { "RootService did not bind" }
++            val bound = checkNotNull(RootConnectionProvider.getServiceProvider) { "RootService unavailable" }
++            check(bound.isRooted) { "RootService reports no root" }
++            val uid = bound.runCommand(listOf("id -u")).joinToString("").trim()
++            check(uid == "0") { "RootService command is not UID 0" }
++            result.putString("root_service_uid", uid)
++            result.putString("root_service_pid", bound.runCommand(listOf("echo \$PPID")).joinToString("").trim())
++            sendStatus(0, result)
++            val hold = arguments?.getString("hold_seconds")?.toLongOrNull()?.coerceIn(0, 120) ?: 0
++            if (hold > 0) Thread.sleep(hold * 1000)
++            finish(Activity.RESULT_OK, result)
++        } catch (failed: Throwable) {
++            result.putString("failure", failed.message ?: failed.javaClass.simpleName)
++            finish(Activity.RESULT_CANCELED, result)
++        }
++    }
++}
+diff --git a/app/src/main/java/org/nullprotocol/nullgate/protocol/RootSessionProtocol.java b/app/src/main/java/org/nullprotocol/nullgate/protocol/RootSessionProtocol.java
+new file mode 100644
+index 0000000..25b2fd8
+--- /dev/null
++++ b/app/src/main/java/org/nullprotocol/nullgate/protocol/RootSessionProtocol.java
+@@ -0,0 +1,83 @@
++package org.nullprotocol.nullgate.protocol;
++
++import java.io.DataInputStream;
++import java.io.DataOutputStream;
++import java.io.IOException;
++
++/** Separate protocol for the user-controlled root switch. No theme rollback or lease timer. */
++public final class RootSessionProtocol {
++    public static final String CONTROL_SOCKET = "nullgate-root-control-v1";
++    public static final String SHELL_SOCKET = "nullgate-root-shell-v1";
++    private static final int MAGIC = 0x4e475253;
++    private static final int VERSION = 1;
++    public enum Operation { STATUS, ON, OFF, SHUTDOWN }
++    public enum State { OFF, ON, FAULT }
++    public enum Code { OK, BUSY, DENIED, STOP_FAILED }
++
++    public static final class Request {
++        public final Operation operation;
++        public final String target;
++        public Request(Operation operation, String target) {
++            if (operation == null || target == null) throw new IllegalArgumentException();
++            if (operation == Operation.ON) requirePackage(target);
++            else if (!target.isEmpty()) throw new IllegalArgumentException("unexpected target");
++            this.operation = operation; this.target = target;
++        }
++        public void writeTo(DataOutputStream out) throws IOException {
++            out.writeInt(MAGIC); out.writeByte(VERSION); out.writeByte(operation.ordinal());
++            out.writeUTF(target); out.flush();
++        }
++        public static Request readFrom(DataInputStream in) throws IOException {
++            header(in); int op = in.readUnsignedByte();
++            if (op >= Operation.values().length) throw new IOException("invalid root operation");
++            try { return new Request(Operation.values()[op], readText(in)); }
++            catch (IllegalArgumentException invalid) { throw new IOException("invalid root request", invalid); }
++        }
++    }
++
++    public static final class Response {
++        public final Code code;
++        public final State state;
++        public final String target;
++        public final int shellCount;
++        public Response(Code code, State state, String target, int shellCount) {
++            if (code == null || state == null || target == null || shellCount < 0 || shellCount > 32)
++                throw new IllegalArgumentException("invalid root status");
++            if (!target.isEmpty()) requirePackage(target);
++            if (state == State.OFF && (!target.isEmpty() || shellCount != 0))
++                throw new IllegalArgumentException("OFF cannot retain a target or shell");
++            if (state != State.OFF && target.isEmpty())
++                throw new IllegalArgumentException("active or unresolved session requires a target");
++            this.code = code; this.state = state; this.target = target; this.shellCount = shellCount;
++        }
++        public void writeTo(DataOutputStream out) throws IOException {
++            out.writeInt(MAGIC); out.writeByte(VERSION); out.writeByte(code.ordinal());
++            out.writeByte(state.ordinal()); out.writeUTF(target); out.writeByte(shellCount); out.flush();
++        }
++        public static Response readFrom(DataInputStream in) throws IOException {
++            header(in); int code = in.readUnsignedByte(), state = in.readUnsignedByte();
++            if (code >= Code.values().length || state >= State.values().length)
++                throw new IOException("invalid root response");
++            try { return new Response(Code.values()[code], State.values()[state], readText(in), in.readUnsignedByte()); }
++            catch (IllegalArgumentException invalid) { throw new IOException("invalid root status", invalid); }
++        }
++    }
++
++    private static void header(DataInputStream in) throws IOException {
++        if (in.readInt() != MAGIC || in.readUnsignedByte() != VERSION)
++            throw new IOException("unsupported root protocol");
++    }
++    private static String readText(DataInputStream in) throws IOException {
++        // Package strings are ASCII, so bound allocation before DataInput.readUTF.
++        int length = in.readUnsignedShort();
++        if (length > 255) throw new IOException("root field too long");
++        byte[] value = new byte[length]; in.readFully(value);
++        for (byte b : value) if (b < 0 || b == 0) throw new IOException("invalid root text");
++        return new String(value, java.nio.charset.StandardCharsets.US_ASCII);
++    }
++    public static void requirePackage(String value) {
++        if (value == null || value.length() > 255 || !value.matches("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+"))
++            throw new IllegalArgumentException("invalid package");
++    }
++    private RootSessionProtocol() { }
++}
+diff --git a/app/src/main/java/org/nullprotocol/nullgate/protocol/RootShellProtocol.java b/app/src/main/java/org/nullprotocol/nullgate/protocol/RootShellProtocol.java
+new file mode 100644
+index 0000000..c222d9f
+--- /dev/null
++++ b/app/src/main/java/org/nullprotocol/nullgate/protocol/RootShellProtocol.java
+@@ -0,0 +1,41 @@
++package org.nullprotocol.nullgate.protocol;
++
++import java.io.DataInputStream;
++import java.io.DataOutputStream;
++import java.io.IOException;
++
++/** Stream framing preserves libsu's separate stdout and stderr without a native su binary. */
++public final class RootShellProtocol {
++    public static final int MAGIC = 0x4e475348;
++    public static final int VERSION = 1;
++    public static final int STDIN = 1, STDOUT = 2, STDERR = 3, EOF = 4, EXIT = 5;
++    public static final int MAX_FRAME = 8192;
++    public static final class Frame {
++        public final int type;
++        public final byte[] data;
++        Frame(int type, byte[] data) { this.type = type; this.data = data; }
++    }
++    public static void handshake(DataOutputStream out) throws IOException {
++        out.writeInt(MAGIC); out.writeByte(VERSION); out.flush();
++    }
++    public static void acceptHandshake(DataInputStream in) throws IOException {
++        if (in.readInt() != MAGIC || in.readUnsignedByte() != VERSION)
++            throw new IOException("unsupported root shell protocol");
++    }
++    public static Frame read(DataInputStream in) throws IOException {
++        int type = in.readUnsignedByte(), size = in.readInt();
++        validate(type, size);
++        byte[] data = new byte[size]; in.readFully(data); return new Frame(type, data);
++    }
++    public static void write(DataOutputStream out, int type, byte[] data, int size) throws IOException {
++        validate(type, size);
++        if (data == null || size > data.length) throw new IOException("invalid frame buffer");
++        synchronized (out) { out.writeByte(type); out.writeInt(size); out.write(data, 0, size); out.flush(); }
++    }
++    private static void validate(int type, int size) throws IOException {
++        if (type < STDIN || type > EXIT || size < 0 || size > MAX_FRAME
++                || (type == EOF && size != 0) || (type == EXIT && size != 4))
++            throw new IOException("invalid root shell frame");
++    }
++    private RootShellProtocol() { }
++}
+diff --git a/app/src/main/java/org/nullprotocol/nullgate/rootclient/RootShellMain.java b/app/src/main/java/org/nullprotocol/nullgate/rootclient/RootShellMain.java
+new file mode 100644
+index 0000000..031e997
+--- /dev/null
++++ b/app/src/main/java/org/nullprotocol/nullgate/rootclient/RootShellMain.java
+@@ -0,0 +1,47 @@
++package org.nullprotocol.nullgate.rootclient;
++
++import android.net.LocalSocket;
++import android.net.LocalSocketAddress;
++import org.nullprotocol.nullgate.protocol.RootSessionProtocol;
++import org.nullprotocol.nullgate.protocol.RootShellProtocol;
++import java.io.DataInputStream;
++import java.io.DataOutputStream;
++
++/** Unprivileged app_process trampoline used as libsu's configured shell command. */
++public final class RootShellMain {
++    public static void main(String[] args) {
++        int exit = 126;
++        try (LocalSocket socket = new LocalSocket()) {
++            socket.connect(new LocalSocketAddress(RootSessionProtocol.SHELL_SOCKET,
++                    LocalSocketAddress.Namespace.ABSTRACT));
++            socket.setSoTimeout(3000);
++            if (socket.getPeerCredentials().getUid() != 0)
++                throw new SecurityException("root endpoint is not root-owned");
++            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
++            DataInputStream in = new DataInputStream(socket.getInputStream());
++            RootShellProtocol.handshake(out);
++            if (in.readUnsignedByte() != 1) throw new SecurityException("NullGate root switch is OFF");
++            socket.setSoTimeout(0);
++            Thread input = new Thread(() -> {
++                byte[] bytes = new byte[RootShellProtocol.MAX_FRAME];
++                try {
++                    int count;
++                    while ((count = System.in.read(bytes)) >= 0)
++                        if (count > 0) RootShellProtocol.write(out, RootShellProtocol.STDIN, bytes, count);
++                    RootShellProtocol.write(out, RootShellProtocol.EOF, bytes, 0);
++                } catch (Exception failed) { try { socket.close(); } catch (Exception ignored) { } }
++            }, "nullgate-shell-input");
++            input.setDaemon(true); input.start();
++            while (true) {
++                RootShellProtocol.Frame frame = RootShellProtocol.read(in);
++                if (frame.type == RootShellProtocol.STDOUT) { System.out.write(frame.data); System.out.flush(); }
++                else if (frame.type == RootShellProtocol.STDERR) { System.err.write(frame.data); System.err.flush(); }
++                else if (frame.type == RootShellProtocol.EXIT) {
++                    exit = java.nio.ByteBuffer.wrap(frame.data).getInt(); break;
++                } else throw new java.io.IOException("unexpected server frame");
++            }
++        } catch (Exception unavailable) { System.err.println("NullGate root unavailable: " + unavailable.getMessage()); }
++        System.exit(exit);
++    }
++    private RootShellMain() { }
++}
