@@ -45,6 +45,8 @@ suite and live foreground-expiry/reconciliation/cleanup validation. The private
 PiXi acceptance pass is complete. ADB is ordinary and the runtime is absent;
 Wolf must turn off the Rooted debugging toggle separately.
 See `LIVE_RECOVERY_REHEARSAL_2026-09-28.md`.
+The updated client and acceptance evidence are preserved in the private RC3
+bundle under `releases/`; RC2 remains unchanged.
 Real theme leases create a snapshot, not an ephemeral lease marker;
 the earlier claim of a marker-related theme defect was not supported by the
 adapter implementation. Unexpected mixed evidence remains fail-closed. Do not

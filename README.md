@@ -56,8 +56,8 @@ record recovery and client reconciliation. That rehearsal exposed a stale
 countdown UI defect; its signed fix passed live foreground countdown, expiry,
 reconciliation and guarded cleanup. Private PiXi acceptance is complete;
 immutable RC2 does not contain this later APK fix.
-RC3 packages that validated fix as a new private candidate; its audit record
-is `RELEASE_PROMOTION_RC3_2026-09-28.md`.
+RC3 packages that validated fix as a new private candidate under `releases/`;
+its audit record is `RELEASE_PROMOTION_RC3_2026-09-28.md`.
 See `LIVE_RECOVERY_REHEARSAL_2026-09-28.md`.
 
 ## Build and tests
