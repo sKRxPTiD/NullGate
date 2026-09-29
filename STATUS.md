@@ -37,12 +37,18 @@ each new capability still needs a narrow adapter and its own restoration test.
 
 ## Remaining non-blocking work
 
-The supervised private PiXi workflow is complete for normal use. Active source
-now also handles an interrupted theme session that leaves its validated lease
-marker behind; the previously promoted RC2 helper refused that state. The new
-path has simulated coverage, but still needs one supervised live recovery
-rehearsal. Do not manufacture a stale receipt or interrupt a broker except
-during that planned test window.
+The supervised interrupted-theme recovery rehearsal passed exact restoration,
+archival, guarded controller-record recovery and client reconciliation. It
+exposed a stale countdown/disabled-Reconcile UI defect; its signed source fix
+passed all 199 host checks, nineteen launcher regressions, the simulated helper
+suite and live foreground-expiry/reconciliation/cleanup validation. The private
+PiXi acceptance pass is complete. ADB is ordinary and the runtime is absent;
+Wolf must turn off the Rooted debugging toggle separately.
+See `LIVE_RECOVERY_REHEARSAL_2026-09-28.md`.
+Real theme leases create a snapshot, not an ephemeral lease marker;
+the earlier claim of a marker-related theme defect was not supported by the
+adapter implementation. Unexpected mixed evidence remains fail-closed. Do not
+manufacture a receipt or interrupt a broker outside the planned test window.
 
 Public distribution is a separate project: it needs a deliberately managed
 release signing identity, a fresh signer-policy review, broader device/ROM
@@ -69,13 +75,14 @@ before removal. The simulated failure regressions pass; see
 `RECOVERY_HARDENING_2026-09-28.md`. The installed launcher uses this source
 helper directly. A supervised PiXi broker start/stop with no lease passed log
 hash verification, cleanup and return to ordinary ADB with an unchanged theme.
-Theme-receipt recovery validation remains simulated. These follow-up changes
+Theme-receipt recovery subsequently passed its supervised live rehearsal.
+Concurrent-change and failure branches remain simulated. These follow-up changes
 were excluded from RC1. RC2 is now packaged and promoted with the hardened
 helper, updated beginner guidance, and the same PiXi-validated Android
 artifacts. See `RELEASE_PROMOTION_RC2_2026-09-28.md`.
-Since RC2 promotion, active source has gained a further recovery fix for
-validated lease markers left by an interrupted broker. It is host-simulated but
-not yet in the immutable RC2 bundle; its live rehearsal is pending.
+The post-RC2 marker-cleanup extension was withdrawn during final review because
+the alleged normal theme-lease state was synthetic. The original recovery gate
+is retained, with a regression verifying that mixed evidence is preserved.
 
 The DoloWOLF launcher was refreshed from tracked source after the 0.2.0 live
 pass and again for the final Start/Stop failure paths. Its read-only doctor

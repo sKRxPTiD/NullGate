@@ -48,9 +48,17 @@ retaining the exact PiXi-validated Android artifact hashes. It is not a public
 release, and the immutable 0.1.0 baseline remains unchanged. See
 `RELEASE_PROMOTION_RC2_2026-09-28.md`. A later DoloWOLF desktop-shortcut fix is
 in active source but was not retroactively added to the immutable RC2 bundle.
-Active source also fixes theme recovery when an interrupted broker leaves a
-validated lease marker; this has simulated coverage and awaits supervised live
-recovery validation before a future candidate bundle.
+The final review corrected an unsupported claim about theme lease markers:
+real theme leases create a snapshot, not a marker. Recovery retains the RC2
+fail-closed gate for unexpected mixed evidence. The actual interrupted-theme
+snapshot path passed a supervised live rehearsal, including guarded controller
+record recovery and client reconciliation. That rehearsal exposed a stale
+countdown UI defect; its signed fix passed live foreground countdown, expiry,
+reconciliation and guarded cleanup. Private PiXi acceptance is complete;
+immutable RC2 does not contain this later APK fix.
+RC3 packages that validated fix as a new private candidate; its audit record
+is `RELEASE_PROMOTION_RC3_2026-09-28.md`.
+See `LIVE_RECOVERY_REHEARSAL_2026-09-28.md`.
 
 ## Build and tests
 

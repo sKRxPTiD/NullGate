@@ -516,41 +516,11 @@ recover_system_theme_runtime() {
   require_private_runtime
   require_no_broker
   local pid receipt_state temp_dir receipt kind snapshot current entries entry archived_receipt receipt_hash remote_receipt_hash
-  local marker_list marker marker_path marker_state marker_content marker_id marker_expiry marker_hash current_marker_hash
-  local -a marker_paths=() marker_hashes=()
   pid="$(validated_stale_pid_receipt)"
   receipt_state="$(adb_device shell "if test -L $DEVICE_DIR/theme.snapshot; then echo SYMLINK; elif test -f $DEVICE_DIR/theme.snapshot; then stat -c 'FILE:%u:%a:%s' $DEVICE_DIR/theme.snapshot; elif test -e $DEVICE_DIR/theme.snapshot; then echo OTHER; else echo ABSENT; fi" | tr -d '\r')"
   [[ "$receipt_state" =~ ^FILE:0:600:([0-9]{1,5})$ ]] || die "theme recovery receipt is absent or unsafe: $receipt_state"
   (( BASH_REMATCH[1] <= 16400 )) || die "theme recovery receipt exceeds safety bound"
-  marker_list="$(adb_device shell "if test -L $DEVICE_DIR/leases; then echo SYMLINK; elif test -d $DEVICE_DIR/leases; then find $DEVICE_DIR/leases -mindepth 1 -maxdepth 1 -printf '%f:%y\\n'; elif test -e $DEVICE_DIR/leases; then echo OTHER; else echo ABSENT; fi" | tr -d '\r')" \
-    || die "lease inventory failed; state is UNKNOWN"
-  [[ "$marker_list" != SYMLINK && "$marker_list" != OTHER ]] \
-    || die "unsafe lease directory; theme recovery refused"
-  if [[ "$marker_list" != ABSENT && -n "$marker_list" ]]; then
-    while IFS= read -r marker; do
-      [[ "$marker" =~ ^([A-Za-z0-9_-]{16,128}\.lease):f$ ]] \
-        || die "unexpected lease artifact; theme recovery refused: $marker"
-      marker_id="${BASH_REMATCH[1]%.lease}"
-      marker_path="$DEVICE_DIR/leases/$marker_id.lease"
-      marker_state="$(adb_device shell "stat -c 'FILE:%u:%a:%s' $marker_path" | tr -d '\r')" \
-        || die "lease marker metadata unavailable; state is UNKNOWN"
-      [[ "$marker_state" =~ ^FILE:0:600:([1-9][0-9]{0,2})$ ]] \
-        || die "unsafe lease marker ownership, mode, or size: $marker_state"
-      (( BASH_REMATCH[1] <= 256 )) || die "lease marker exceeds the recovery size limit"
-      marker_content="$(adb_device shell "cat $marker_path" | tr -d '\r')" \
-        || die "lease marker could not be read; state is UNKNOWN"
-      marker_expiry="$(printf '%s\n' "$marker_content" | sed -n 's/^expiresElapsed=//p')"
-      [[ "$marker_content" == "lease=$marker_id"$'\n'"expiresElapsed=$marker_expiry" \
-          && "$marker_expiry" =~ ^[0-9]{1,19}$ ]] \
-        || die "lease marker content failed validation: $marker_id.lease"
-      marker_hash="$(adb_device shell "sha256sum $marker_path" | awk '{print $1}' | tr -d '\r')" \
-        || die "lease marker hash unavailable; state is UNKNOWN"
-      [[ "$marker_hash" =~ ^[0-9a-f]{64}$ ]] || die "lease marker hash is invalid"
-      marker_paths+=("$marker_path")
-      marker_hashes+=("$marker_hash")
-      (( ${#marker_paths[@]} <= 1 )) || die "multiple lease markers exceed the broker's one-active-lease policy"
-    done <<< "$marker_list"
-  fi
+  verify_no_leases
   entries="$(adb_device shell "find $DEVICE_DIR -mindepth 1 -maxdepth 1 -printf '%f\n'" | tr -d '\r')" \
     || die "runtime inventory failed"
   while IFS= read -r entry; do
@@ -592,18 +562,6 @@ recover_system_theme_runtime() {
   [[ "$(sha256sum "$archived_receipt" | awk '{print $1}')" == "$receipt_hash" ]] \
     || { rm -rf -- "$temp_dir"; die "theme recovery archive failed hash verification; device receipt preserved"; }
   rm -rf -- "$temp_dir"
-  require_no_broker
-  [[ "$(adb_device shell "sha256sum $DEVICE_DIR/theme.snapshot" | awk '{print $1}' | tr -d '\r')" == "$remote_receipt_hash" ]] \
-    || die "theme recovery receipt changed before removal; runtime preserved"
-  for i in "${!marker_paths[@]}"; do
-    require_no_broker
-    current_marker_hash="$(adb_device shell "sha256sum ${marker_paths[$i]}" | awk '{print $1}' | tr -d '\r')" \
-      || die "lease marker hash unavailable before removal; runtime preserved"
-    [[ "$current_marker_hash" == "${marker_hashes[$i]}" ]] \
-      || die "lease marker changed before removal; runtime preserved"
-    adb_device shell "rm -f ${marker_paths[$i]}" >/dev/null \
-      || die "validated lease marker removal failed; theme receipt preserved"
-  done
   require_no_broker
   [[ "$(adb_device shell "sha256sum $DEVICE_DIR/theme.snapshot" | awk '{print $1}' | tr -d '\r')" == "$remote_receipt_hash" ]] \
     || die "theme recovery receipt changed before removal; runtime preserved"

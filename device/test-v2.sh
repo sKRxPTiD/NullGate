@@ -386,28 +386,13 @@ archive_count_after="$(find "$TEST_DIR/logs" -maxdepth 1 -type f -name 'theme-re
   echo "successive theme recoveries overwrote archived evidence" >&2; exit 1;
 }
 set_state 1 1 1 0 1 1 0 0 1
-run_theme_helper theme-recovery-with-lease recover-system-theme-runtime >/dev/null
-run_theme_helper ready verify-clean >/dev/null
-[[ "$(cat "$STATE")" == "installed=1 runtime=0 broker=0 running=0 pid_receipt=0 leases=0 unknown=0 test_client=0 theme_snapshot=0 theme_client=0" ]] || {
-  echo "interrupted theme recovery did not restore and remove stale lease evidence" >&2; exit 1;
-}
-for scenario in theme-recovery-marker-invalid theme-recovery-marker-unsafe theme-recovery-lease-symlink; do
-  set_state 1 1 1 0 1 1 0 0 1
-  before="$(cat "$STATE")"
-  if output="$(run_theme_helper "$scenario" recover-system-theme-runtime 2>&1)"; then
-    echo "theme recovery accepted unsafe lease evidence: $scenario" >&2; exit 1
-  fi
-  [[ "$(cat "$STATE")" == "$before" ]] || {
-    echo "rejected lease evidence changed device state: $scenario" >&2; exit 1;
-  }
-done
-set_state 1 1 1 0 1 1 0 0 1
-if output="$(run_theme_helper theme-recovery-marker-changed recover-system-theme-runtime 2>&1)"; then
-  echo "theme recovery removed a changed lease marker" >&2; exit 1
+before="$(cat "$STATE")"
+if output="$(run_theme_helper theme-recovery recover-system-theme-runtime 2>&1)"; then
+  echo "theme recovery accepted unexpected mixed theme/marker evidence" >&2; exit 1
 fi
-[[ "$output" == *"lease marker changed before removal"* ]]
-[[ "$(cat "$STATE")" == *"pid_receipt=1"*"leases=1"*"theme_snapshot=1"* ]] || {
-  echo "changed lease marker failure did not preserve recovery evidence" >&2; exit 1;
+[[ "$output" == *"lease artifacts remain"* ]]
+[[ "$(cat "$STATE")" == "$before" ]] || {
+  echo "mixed theme/marker rejection did not preserve recovery evidence" >&2; exit 1;
 }
 set_state 1 1 1 0 1 0 0 0 1
 run_theme_helper theme-recovery recover-system-theme-runtime >/dev/null

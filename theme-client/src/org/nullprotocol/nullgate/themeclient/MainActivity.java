@@ -10,6 +10,8 @@ import android.content.pm.Signature;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.view.Gravity;
 import android.view.View;
@@ -53,6 +55,17 @@ public final class MainActivity extends Activity {
     private Button requestButton;
     private Button revokeButton;
     private Button reconcileButton;
+    private final Handler leaseUiHandler = new Handler(Looper.getMainLooper());
+    private final Runnable refreshLeaseUi = new Runnable() {
+        @Override public void run() {
+            if (!ThemeClientStatePolicy.ACTIVE.equals(store().getString("phase", null)))
+                return; // Preserve terminal results and pending/uncertain-operation messages.
+            refreshState();
+            if (ThemeClientStatePolicy.ACTIVE.equals(currentPhase(SystemClock.elapsedRealtime())))
+                leaseUiHandler.postDelayed(this, 1_000L);
+            // Elapsed time enables reconciliation; it never proves restoration.
+        }
+    };
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -61,6 +74,17 @@ public final class MainActivity extends Activity {
         setContentView(buildPage());
         restoreSelection();
         refreshState();
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        leaseUiHandler.removeCallbacks(refreshLeaseUi);
+        leaseUiHandler.post(refreshLeaseUi);
+    }
+
+    @Override protected void onPause() {
+        leaseUiHandler.removeCallbacks(refreshLeaseUi);
+        super.onPause();
     }
 
     private View buildPage() {

@@ -30,8 +30,9 @@ broker shutdown and runtime removal on 2026-09-28. See
    first-party Theme Client. ColorBlendr is a separate optional client.
 5. In Theme Client, pick a palette and style, request the two-minute lease, then
    approve it on NullGate's protected approval screen.
-6. To end early, tap **Restore previous theme now**. Otherwise wait for expiry,
-   return to Theme Client, and tap **Reconcile** to confirm restoration.
+6. To end early, tap **Restore previous theme now**. Otherwise leave Theme
+   Client open: the countdown updates, and expiry enables **Reconcile uncertain
+   result**. Tap it and wait for **Reconciled clean** to confirm restoration.
 7. Return to the DoloWOLF launcher and choose **Stop and clean session**. Wait
    for its clean-session message, then turn **Rooted debugging off** on PiXi.
 
@@ -39,6 +40,12 @@ If any step reports UNKNOWN, an error, or an uncertain result, do not repeat
 approval. Choose **Show status** and preserve the screen and logs for recovery.
 Use **Recover verified stale runtime** only after an interrupted or expired
 session, when no lease should remain.
+
+The advancing countdown may replace the brief GRANTED message immediately.
+Expiry enables reconciliation but does not itself prove cleanup. This workflow
+passed on the updated client; the immutable RC2 client predates the foreground
+countdown fix. NullGate grants temporary, bounded theme changes—not permanent
+theming or general root access for arbitrary apps.
 
 ## Routine operation
 

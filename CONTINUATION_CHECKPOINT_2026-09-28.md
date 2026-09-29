@@ -29,16 +29,29 @@ and limits are in `RECOVERY_HARDENING_2026-09-28.md`.
 
 A supervised no-lease broker start/stop passed live log hashing, archival,
 cleanup, unchanged-theme verification and the final read-only doctor on PiXi.
-ADB returned to ordinary shell. Wolf confirmed Rooted debugging is off.
-No device operation is in progress.
+ADB returned to ordinary shell. Wolf confirmed Rooted debugging was off after
+that check. Wolf subsequently enabled it for the final recovery rehearsal.
+The interrupted-theme rehearsal passed exact restoration, archived evidence,
+guarded expired-controller-record recovery and final client reconciliation.
+It exposed a real stale-countdown/disabled-Reconcile UI defect. Its source fix
+passed all 199 host checks and the signed build. Only the updated Theme Client
+APK changed, to SHA-256
+`b999f127f10caf934a0be2f8943e62c0faa81d2464f06c7a45c02e6f5e4c91d9`.
+The final foreground countdown/expiry test passed without restart, followed by
+exact restoration, normal reconciliation, guarded Stop and a clean doctor.
+Nineteen launcher regressions and the simulated helper suite also passed.
+No device work is in progress; ADB is ordinary and the runtime is absent.
+Rooted debugging must be turned off on PiXi; confirmation is pending. See
+`LIVE_RECOVERY_REHEARSAL_2026-09-28.md` for the saved baseline and live evidence.
 
-Theme-receipt recovery has extensive simulated failure coverage. A Sol review
-found that the prior helper refused a valid leftover lease marker after broker
-interruption; active source now validates, archives/restores, and removes that
-marker under the receipt and broker-absence checks. The new branch still needs
-one supervised live recovery rehearsal. Do not count the no-lease broker check
-as proof. Do not manufacture a stale theme receipt or interrupt a broker
-outside that planned test window.
+Theme-receipt recovery has extensive simulated failure coverage. Final review
+corrected the earlier claimed marker defect: the system-theme adapter does not
+create ephemeral lease markers. The mixed marker/snapshot state was synthetic.
+The unneeded cleanup extension was withdrawn; unexpected mixed evidence stays
+preserved under the original fail-closed gate. Actual snapshot recovery now
+passed its supervised live rehearsal. Do not interrupt another broker or
+repeat the crash test. The countdown check also passed; the private PiXi
+acceptance pass is complete. Routine use is in `OPERATOR_GUIDE.md`.
 
 The preserved 0.2.0 RC1 ZIP and checksum still verify. Its helper predates this
 hardening. RC2 contains the hardened helper and updated beginner guide and was
