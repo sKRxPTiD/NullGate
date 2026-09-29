@@ -19,6 +19,11 @@ root bridge; selecting an arbitrary unmodified APK does not supply it a `su`
 binary. PiXi requires DoloWOLF to start the broker after reboot and to keep
 Rooted debugging enabled until clean Stop.
 
+The private 0.3.0 release was promoted as a new bundle on 2026-09-29 from
+source commit `e08210cba7f213ec8590466887a92871e9653f06`. See
+[the release record](RELEASE_PROMOTION_0.3.0_2026-09-29.md) for its checksum,
+reproducible-build evidence and location.
+
 The default build and user workflow are the **manual root switch**. The
 sections below describe the **legacy typed-theme implementation**. Its
 tests and immutable bundles remain historical evidence, not the corrected

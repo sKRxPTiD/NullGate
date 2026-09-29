@@ -37,6 +37,11 @@ complete phone switch flow. The final 0.3.0 private release contains signed
 runtime artifacts, operator records and the exact committed source archive.
 It is additive to the historical bundles. Signing secrets are excluded.
 
+The release from source commit `e08210cba7f213ec8590466887a92871e9653f06`
+passed two byte-identical signed builds and was promoted to
+`../releases/NullGate-PiXi-private-0.3.0-2026-09-29-e08210cba7f2.zip`.
+See `RELEASE_PROMOTION_0.3.0_2026-09-29.md` for the final digest and checks.
+
 See `root-client/VALIDATION.md` and `root-client/USAGE.md` for the current evidence
 and simple operating directions.
 
